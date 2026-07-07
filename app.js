@@ -2,7 +2,7 @@ const STORAGE_KEY = "vem-presenca-studio-v2";
 const AUTH_KEY = "vem-presenca-admin-auth-v1";
 const API_ENDPOINT = "api.php";
 const APP_VERSION = "1.0.0";
-const APP_BUILD = "2026-07-07.14";
+const APP_BUILD = "2026-07-07.15";
 const GITHUB_REPO = "Lhsa050/cruzadamilagres";
 const GITHUB_BRANCH = "main";
 const THEME_OPTIONS = [
@@ -497,7 +497,6 @@ function scrollTopOnRouteChange(shouldScrollTop) {
 
 function renderShell(content) {
   const admin = isAdminAuthenticated();
-  const showEventShortcut = selectedEventId && (!admin || adminSection === "dashboard");
   document.getElementById("app").innerHTML = `
     <div class="app-shell">
       <header class="topbar">
@@ -505,7 +504,6 @@ function renderShell(content) {
           ${renderBrandLink(admin ? "#/admin" : `#/evento/${encodeURIComponent(state.events[0]?.slug || "")}`)}
           <nav class="nav-actions" aria-label="Navegação">
             ${admin ? `<a class="btn ghost" href="#/admin"><i data-lucide="layout-dashboard"></i><span>Painel</span></a>` : ""}
-            ${showEventShortcut ? `<a class="btn" href="#/evento/${encodeURIComponent(eventById(selectedEventId)?.slug || "")}"><i data-lucide="external-link"></i><span>Página pública</span></a>` : ""}
             ${admin ? `<button class="btn ghost" type="button" data-action="logout-admin"><i data-lucide="log-out"></i><span>Sair</span></button>` : ""}
           </nav>
         </div>
