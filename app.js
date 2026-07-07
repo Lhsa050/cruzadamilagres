@@ -4,7 +4,7 @@ const ADMIN_EMAIL = "admin@evento.local";
 const ADMIN_PASSWORD = "admin123";
 const API_ENDPOINT = "api.php";
 const APP_VERSION = "1.0.0";
-const APP_BUILD = "2026-07-07.5";
+const APP_BUILD = "2026-07-07.6";
 const GITHUB_REPO = "Lhsa050/cruzadamilagres";
 const GITHUB_BRANCH = "main";
 
@@ -58,7 +58,7 @@ function loadState() {
       const parsed = JSON.parse(raw);
       if (parsed?.events?.length) {
         parsed.files = Array.isArray(parsed.files) ? parsed.files : [];
-        parsed.site = parsed.site || { activeCssFileId: "" };
+        parsed.site = normalizeSiteSettings(parsed.site);
         return parsed;
       }
     }
@@ -75,7 +75,7 @@ function normalizeStateShape(nextState) {
   normalized.events = Array.isArray(normalized.events) ? normalized.events : [];
   normalized.participants = Array.isArray(normalized.participants) ? normalized.participants : [];
   normalized.files = Array.isArray(normalized.files) ? normalized.files : [];
-  normalized.site = normalized.site || { activeCssFileId: "" };
+  normalized.site = normalizeSiteSettings(normalized.site);
   return normalized;
 }
 
@@ -132,7 +132,7 @@ function seedState() {
   ];
 
   participants[1].checkInAt = new Date(Date.now() - 1000 * 60 * 46).toISOString();
-  return { events: [event], participants, files: [], site: { activeCssFileId: "" } };
+  return { events: [event], participants, files: [], site: defaultSiteSettings() };
 }
 
 function saveState() {
@@ -271,6 +271,46 @@ function imageSrc(value, fallback = BLANK_COVER) {
   return String(value || "").trim() || fallback;
 }
 
+function defaultSiteSettings() {
+  return {
+    activeCssFileId: "",
+    brandName: "Vem Presença",
+    logoUrl: ""
+  };
+}
+
+function normalizeSiteSettings(site) {
+  return { ...defaultSiteSettings(), ...(site && typeof site === "object" ? site : {}) };
+}
+
+function siteSettings() {
+  state.site = normalizeSiteSettings(state.site);
+  return state.site;
+}
+
+function brandName() {
+  return siteSettings().brandName.trim() || "Vem Presença";
+}
+
+function logoUrl() {
+  return siteSettings().logoUrl.trim();
+}
+
+function renderBrandIdentity() {
+  const name = brandName();
+  const logo = logoUrl();
+  return `
+    ${logo
+      ? `<img class="brand-logo" src="${escapeHtml(logo)}" alt="${escapeHtml(name)}">`
+      : `<span class="brand-mark"><i data-lucide="qr-code"></i></span>`}
+    <span>${escapeHtml(name)}</span>
+  `;
+}
+
+function renderBrandLink(href) {
+  return `<a class="brand ${logoUrl() ? "has-logo" : ""}" href="${href}" aria-label="${escapeHtml(brandName())}">${renderBrandIdentity()}</a>`;
+}
+
 function textToParagraphs(text) {
   return escapeHtml(text || "")
     .split(/\n{2,}/)
@@ -401,10 +441,7 @@ function renderShell(content) {
     <div class="app-shell">
       <header class="topbar">
         <div class="topbar-inner">
-          <a class="brand" href="${admin ? "#/admin" : `#/evento/${encodeURIComponent(state.events[0]?.slug || "")}`}" aria-label="Vem Presença">
-            <span class="brand-mark"><i data-lucide="qr-code"></i></span>
-            <span>Vem Presença</span>
-          </a>
+          ${renderBrandLink(admin ? "#/admin" : `#/evento/${encodeURIComponent(state.events[0]?.slug || "")}`)}
           <nav class="nav-actions" aria-label="Navegação">
             ${admin ? `<a class="btn ghost" href="#/admin"><i data-lucide="layout-dashboard"></i><span>Painel</span></a>` : ""}
             ${selectedEventId ? `<a class="btn" href="#/evento/${encodeURIComponent(eventById(selectedEventId)?.slug || "")}"><i data-lucide="external-link"></i><span>Página pública</span></a>` : ""}
@@ -485,7 +522,7 @@ function renderAdmin() {
     createEvent();
     return;
   }
-  if (!["dashboard", "updates"].includes(adminSection)) adminSection = "dashboard";
+  if (!["dashboard", "settings", "updates"].includes(adminSection)) adminSection = "dashboard";
   if (!selectedEventId || !eventById(selectedEventId)) selectedEventId = state.events[0].id;
   const event = eventById(selectedEventId);
   const participants = participantsForEvent(event.id);
@@ -498,9 +535,9 @@ function renderAdmin() {
       <div class="admin-layout">
         <aside class="sidebar" aria-label="Eventos">
           <section class="admin-profile">
-            <div class="admin-profile-mark"><i data-lucide="shield-check"></i></div>
+            <div class="admin-profile-mark">${logoUrl() ? `<img src="${escapeHtml(logoUrl())}" alt="${escapeHtml(brandName())}">` : `<i data-lucide="shield-check"></i>`}</div>
             <div>
-              <strong>Vem Presença</strong>
+              <strong>${escapeHtml(brandName())}</strong>
               <span>Administração</span>
             </div>
           </section>
@@ -532,6 +569,10 @@ function renderAdmin() {
               <button type="button" class="${adminSection === "dashboard" ? "active" : ""}" data-admin-section="dashboard">
                 <i data-lucide="layout-dashboard"></i>
                 <span>Painel</span>
+              </button>
+              <button type="button" class="${adminSection === "settings" ? "active" : ""}" data-admin-section="settings">
+                <i data-lucide="settings"></i>
+                <span>Configurações</span>
               </button>
               <button type="button" class="${adminSection === "updates" ? "active" : ""}" data-admin-section="updates">
                 <i data-lucide="refresh-cw"></i>
@@ -735,6 +776,9 @@ function renderAdmin() {
           </section>
 
           </div>
+          <div class="admin-tab-panel" data-admin-panel="settings" ${adminSection === "settings" ? "" : "hidden"}>
+            ${renderSettingsPanel()}
+          </div>
           <div class="admin-tab-panel" data-admin-panel="updates" ${adminSection === "updates" ? "" : "hidden"}>
             ${renderUpdateManager()}
           </div>
@@ -819,6 +863,51 @@ function renderParticipantsTable(event) {
         </tbody>
       </table>
     </div>
+  `;
+}
+
+function renderSettingsPanel() {
+  const settings = siteSettings();
+  return `
+    <section class="panel">
+      <div class="panel-header">
+        <div class="panel-title">
+          <h2>Configurações</h2>
+          <p>Personalize a marca exibida no cabeçalho do site.</p>
+        </div>
+      </div>
+      <div class="panel-body content-stack">
+        <form id="site-settings-form" class="settings-grid">
+          <div class="settings-preview">
+            <span class="label">Prévia da marca</span>
+            <div class="brand-preview ${logoUrl() ? "has-logo" : ""}">
+              ${renderBrandIdentity()}
+            </div>
+            <div class="logo-preview" data-logo-preview>
+              ${settings.logoUrl
+                ? `<img src="${escapeHtml(settings.logoUrl)}" alt="${escapeHtml(brandName())}">`
+                : `<div class="logo-preview-empty"><i data-lucide="image"></i><span>Nenhuma logo importada</span></div>`}
+            </div>
+          </div>
+
+          <div class="settings-fields">
+            <label class="field">
+              <span>Nome exibido</span>
+              <input name="brandName" value="${escapeHtml(settings.brandName)}" placeholder="Nome da sua marca">
+            </label>
+            <label class="field">
+              <span>Logo do cabeçalho</span>
+              <input name="logoUrl" value="${escapeHtml(settings.logoUrl)}" placeholder="Cole uma URL ou importe uma imagem">
+              <input name="logoFile" type="file" accept="image/*">
+            </label>
+            <div class="button-row">
+              <button class="btn primary" type="submit"><i data-lucide="save"></i><span>Salvar configurações</span></button>
+              <button class="btn danger" type="button" data-action="clear-site-logo"><i data-lucide="eraser"></i><span>Remover logo</span></button>
+            </div>
+          </div>
+        </form>
+      </div>
+    </section>
   `;
 }
 
@@ -933,8 +1022,64 @@ function bindAdmin(event) {
   const eventForm = document.getElementById("event-form");
   bindImageImporter(eventForm, "coverFile", "coverUrl", ".preview-cover");
   bindImageImporter(eventForm, "organizerFile", "organizerImage");
+  bindSettingsPanel();
   bindUpdateManager();
 
+  refreshIcons();
+}
+
+function bindSettingsPanel() {
+  const form = document.getElementById("site-settings-form");
+  if (!form) return;
+
+  form.addEventListener("submit", (submitEvent) => {
+    submitEvent.preventDefault();
+    const formData = new FormData(form);
+    const settings = siteSettings();
+    settings.brandName = String(formData.get("brandName") || "").trim() || "Vem Presença";
+    settings.logoUrl = String(formData.get("logoUrl") || "").trim();
+    saveState();
+    toast("Configurações salvas.");
+    renderAdmin();
+  });
+
+  form.querySelector("input[name='logoUrl']")?.addEventListener("input", (event) => {
+    updateLogoPreview(event.currentTarget.value);
+  });
+
+  form.querySelector("input[name='logoFile']")?.addEventListener("change", (event) => {
+    const file = event.currentTarget.files?.[0];
+    if (!file) return;
+    if (!file.type.startsWith("image/")) {
+      toast("Escolha um arquivo de imagem.", true);
+      event.currentTarget.value = "";
+      return;
+    }
+    const reader = new FileReader();
+    reader.addEventListener("load", () => {
+      const value = String(reader.result || "");
+      form.querySelector("input[name='logoUrl']").value = value;
+      updateLogoPreview(value);
+    });
+    reader.readAsDataURL(file);
+  });
+
+  document.querySelector("[data-action='clear-site-logo']")?.addEventListener("click", () => {
+    const settings = siteSettings();
+    settings.logoUrl = "";
+    saveState();
+    toast("Logo removida.");
+    renderAdmin();
+  });
+}
+
+function updateLogoPreview(value) {
+  const target = document.querySelector("[data-logo-preview]");
+  if (!target) return;
+  const src = String(value || "").trim();
+  target.innerHTML = src
+    ? `<img src="${escapeHtml(src)}" alt="${escapeHtml(brandName())}">`
+    : `<div class="logo-preview-empty"><i data-lucide="image"></i><span>Nenhuma logo importada</span></div>`;
   refreshIcons();
 }
 
@@ -1745,10 +1890,7 @@ function renderPublicEvent(event) {
     <main class="public-page">
       <header class="topbar">
         <div class="topbar-inner">
-          <a class="brand" href="${admin ? "#/admin" : `#/evento/${encodeURIComponent(event.slug)}`}" aria-label="Vem Presença">
-            <span class="brand-mark"><i data-lucide="qr-code"></i></span>
-            <span>Vem Presença</span>
-          </a>
+          ${renderBrandLink(admin ? "#/admin" : `#/evento/${encodeURIComponent(event.slug)}`)}
           <nav class="nav-actions" aria-label="Navegação">
             ${admin ? `<a class="btn ghost" href="#/admin"><i data-lucide="settings"></i><span>Painel</span></a><button class="btn ghost" type="button" data-action="logout-admin"><i data-lucide="log-out"></i><span>Sair</span></button>` : ""}
           </nav>

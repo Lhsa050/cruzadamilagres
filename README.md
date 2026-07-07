@@ -24,6 +24,7 @@ Na Hostinger, o e-mail e a senha são definidos em `install.php`.
 - Proteger o painel com login de administrador.
 - Mostrar visitantes apenas como convidados, sem botão de login no cabeçalho público.
 - Importar imagens de capa/organizador por arquivo local ou colar URL.
+- Trocar nome e logo do cabeçalho pela aba `Configurações` do painel.
 - Instalar em hospedagem PHP pela Hostinger com `install.php` e persistência em `data/state.json`.
 - Buscar atualizações pelo painel administrativo e atualizar os arquivos direto do GitHub.
 - Confirmar presença pela página pública em duas etapas.
