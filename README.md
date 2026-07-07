@@ -29,6 +29,7 @@ Na Hostinger, o e-mail e a senha do administrador são definidos em `install.php
 - Validar e-mail e telefone com DDD antes de gerar o QR Code.
 - Bloquear inscrição duplicada no mesmo evento por e-mail ou telefone.
 - Habilitar convidado por evento; quando habilitado, a inscrição ganha etapa própria para informar o nome do convidado.
+- Habilitar grupo de WhatsApp por evento; quando habilitado, o participante vê o botão para entrar no grupo após confirmar presença.
 - Gerar código e QR Code único para cada participante.
 - Validar QR pelo painel usando código, ID ou link do ticket.
 - Marcar/desmarcar check-in.

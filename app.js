@@ -2,7 +2,7 @@ const STORAGE_KEY = "vem-presenca-studio-v2";
 const AUTH_KEY = "vem-presenca-admin-auth-v1";
 const API_ENDPOINT = "api.php";
 const APP_VERSION = "1.0.0";
-const APP_BUILD = "2026-07-07.17";
+const APP_BUILD = "2026-07-07.18";
 const GITHUB_REPO = "Lhsa050/cruzadamilagres";
 const GITHUB_BRANCH = "main";
 const THEME_OPTIONS = [
@@ -106,6 +106,8 @@ function seedState() {
     organizerPhone: "(47) 99122-2131",
     organizerImage: DEFAULT_ORGANIZER,
     allowGuests: false,
+    whatsappGroupEnabled: false,
+    whatsappGroupUrl: "",
     description: sampleDescription,
     createdAt: new Date().toISOString(),
     sessions: [
@@ -457,6 +459,23 @@ function getTicketUrl(participant) {
   return `${location.origin}${location.pathname}#/ticket/${encodeURIComponent(participant.id)}`;
 }
 
+function whatsappGroupUrl(event) {
+  return String(event?.whatsappGroupUrl || "").trim();
+}
+
+function hasWhatsappGroup(event) {
+  return Boolean(event?.whatsappGroupEnabled && whatsappGroupUrl(event));
+}
+
+function isValidHttpUrl(value) {
+  try {
+    const url = new URL(String(value || "").trim());
+    return url.protocol === "http:" || url.protocol === "https:";
+  } catch {
+    return false;
+  }
+}
+
 function render() {
   const route = getRoute();
   const routeKey = `${route.name}:${route.slug || route.id || ""}`;
@@ -776,6 +795,15 @@ function renderAdmin() {
                     <input name="allowGuests" type="checkbox" ${event.allowGuests ? "checked" : ""}>
                     Permitir que o participante leve convidado
                   </label>
+                  <label class="checkbox-label field full">
+                    <input name="whatsappGroupEnabled" type="checkbox" ${event.whatsappGroupEnabled ? "checked" : ""}>
+                    Mostrar botão para grupo de WhatsApp após a confirmação
+                  </label>
+                  <label class="field full">
+                    <span>Grupo de WhatsApp</span>
+                    <input name="whatsappGroupUrl" value="${escapeHtml(whatsappGroupUrl(event))}" placeholder="https://chat.whatsapp.com/...">
+                    <p class="help-text">Se habilitado, o participante verá o botão Entrar no grupo de WhatsApp na tela do QR Code.</p>
+                  </label>
                   <label class="field full">
                     <span>Descrição</span>
                     <textarea name="description">${escapeHtml(event.description)}</textarea>
@@ -1089,6 +1117,7 @@ function bindAdmin(event) {
   const eventForm = document.getElementById("event-form");
   bindImageImporter(eventForm, "coverFile", "coverUrl", ".preview-cover");
   bindImageImporter(eventForm, "organizerFile", "organizerImage");
+  bindWhatsappOption(eventForm);
   bindSettingsPanel();
   bindUpdateManager();
 
@@ -1257,6 +1286,45 @@ function bindImageImporter(scope, fileName, inputName, previewSelector) {
   });
 }
 
+function bindWhatsappOption(form) {
+  const checkbox = form?.querySelector("input[name='whatsappGroupEnabled']");
+  const input = form?.querySelector("input[name='whatsappGroupUrl']");
+  if (!checkbox || !input) return;
+
+  const sync = () => {
+    input.readOnly = !checkbox.checked;
+    input.required = checkbox.checked;
+    input.closest(".field")?.classList.toggle("disabled", !checkbox.checked);
+    clearFieldError(input);
+  };
+
+  checkbox.addEventListener("change", sync);
+  input.addEventListener("input", () => clearFieldError(input));
+  sync();
+}
+
+function validateWhatsappGroup(form) {
+  const checkbox = form?.querySelector("input[name='whatsappGroupEnabled']");
+  const input = form?.querySelector("input[name='whatsappGroupUrl']");
+  if (!checkbox || !input) return true;
+
+  clearFieldError(input);
+  if (!checkbox.checked) return true;
+
+  const value = input.value.trim();
+  if (!value) {
+    setFieldError(input, "Informe o link do grupo de WhatsApp.");
+    return false;
+  }
+
+  if (!isValidHttpUrl(value)) {
+    setFieldError(input, "Use um link começando com https:// ou http://.");
+    return false;
+  }
+
+  return true;
+}
+
 function saveEventFromForm(event, form) {
   const formData = new FormData(form);
   const nextSlug = slugify(formData.get("slug")) || slugify(formData.get("title")) || event.slug;
@@ -1267,6 +1335,7 @@ function saveEventFromForm(event, form) {
   }
 
   const sessions = collectSessionRows(form);
+  if (!validateWhatsappGroup(form)) return;
 
   Object.assign(event, {
     title: formData.get("title").trim(),
@@ -1284,6 +1353,8 @@ function saveEventFromForm(event, form) {
     organizerPhone: formData.get("organizerPhone").trim(),
     organizerImage: formData.get("organizerImage").trim(),
     allowGuests: formData.get("allowGuests") === "on",
+    whatsappGroupEnabled: formData.get("whatsappGroupEnabled") === "on",
+    whatsappGroupUrl: String(formData.get("whatsappGroupUrl") || "").trim(),
     description: formData.get("description").trim(),
     sessions
   });
@@ -1406,6 +1477,17 @@ function eventCreationFormHtml() {
           Permitir que o participante leve convidado
         </label>
 
+        <label class="checkbox-label">
+          <input name="whatsappGroupEnabled" type="checkbox">
+          Mostrar botão para grupo de WhatsApp após a confirmação
+        </label>
+
+        <label class="field full">
+          <span>Grupo de WhatsApp</span>
+          <input name="whatsappGroupUrl" placeholder="https://chat.whatsapp.com/...">
+          <p class="help-text">Opcional. Se habilitado, aparece no final da confirmação, junto do QR Code.</p>
+        </label>
+
         <div class="field full">
           <span class="label">Sessões</span>
           <p class="help-text">Começa vazio. Adicione somente se o evento já tiver sessões definidas.</p>
@@ -1426,6 +1508,7 @@ function bindEventCreationWizard(form) {
   if (!form) return;
   bindImageImporter(form, "coverFile", "coverUrl");
   bindImageImporter(form, "organizerFile", "organizerImage");
+  bindWhatsappOption(form);
 
   const accent = form.querySelector("input[name='accent']");
   const accentText = form.querySelector("input[name='accentText']");
@@ -1473,6 +1556,7 @@ function bindEventCreationWizard(form) {
       setWizardStep(form, 1);
       return;
     }
+    if (!validateWhatsappGroup(form)) return;
     const formData = new FormData(form);
     const id = "evt_" + randomId(8);
     const titleValue = formData.get("title").trim();
@@ -1493,6 +1577,8 @@ function bindEventCreationWizard(form) {
       organizerPhone: formData.get("organizerPhone").trim(),
       organizerImage: formData.get("organizerImage").trim(),
       allowGuests: formData.get("allowGuests") === "on",
+      whatsappGroupEnabled: formData.get("whatsappGroupEnabled") === "on",
+      whatsappGroupUrl: String(formData.get("whatsappGroupUrl") || "").trim(),
       description: formData.get("description").trim(),
       createdAt: new Date().toISOString(),
       sessions: collectSessionRows(form)
@@ -2097,6 +2183,7 @@ function renderTicket(participant) {
   if (!event) return renderNotFound("Evento do ticket não encontrado");
   const session = sessionById(event, participant.sessionId);
   const admin = isAdminAuthenticated();
+  const showWhatsappGroup = hasWhatsappGroup(event);
   const ticketPayload = JSON.stringify({
     ticket: participant.ticketCode,
     participantId: participant.id,
@@ -2135,6 +2222,7 @@ function renderTicket(participant) {
               <div class="button-row">
                 <button class="btn primary" type="button" data-action="print-ticket"><i data-lucide="printer"></i><span>Imprimir</span></button>
                 <button class="btn" type="button" data-action="copy-ticket-public"><i data-lucide="copy"></i><span>Copiar link</span></button>
+                ${showWhatsappGroup ? `<a class="btn whatsapp" href="${escapeHtml(whatsappGroupUrl(event))}" target="_blank" rel="noopener noreferrer"><i data-lucide="message-circle"></i><span>Entrar no grupo de WhatsApp</span></a>` : ""}
               </div>
             </div>
             <div class="qr-box">

@@ -323,6 +323,12 @@ img {
   --btn-text: var(--rose);
 }
 
+.btn.whatsapp {
+  --btn-bg: linear-gradient(180deg, #25d366 0%, #16a34a 100%);
+  --btn-border: rgba(22, 163, 74, 0.72);
+  --btn-text: #fff;
+}
+
 .btn.small {
   min-height: 34px;
   padding-inline: 10px;
@@ -380,6 +386,12 @@ html[data-theme="dark"] .btn.danger {
   --btn-bg: #301820;
   --btn-border: #7f1d2d;
   --btn-text: #fecdd3;
+}
+
+html[data-theme="dark"] .btn.whatsapp {
+  --btn-bg: linear-gradient(180deg, #25d366 0%, #16a34a 100%);
+  --btn-border: rgba(37, 211, 102, 0.52);
+  --btn-text: #fff;
 }
 
 html[data-theme="dark"] .btn[disabled] {
@@ -842,6 +854,10 @@ h3 {
 
 .field.full {
   grid-column: 1 / -1;
+}
+
+.field.disabled input {
+  opacity: 0.62;
 }
 
 label,
@@ -1942,6 +1958,12 @@ html[data-theme="dark"] .btn.danger {
   --btn-bg: rgba(251, 113, 133, 0.13);
   --btn-border: rgba(251, 113, 133, 0.28);
   --btn-text: #fecdd3;
+}
+
+html[data-theme="dark"] .btn.whatsapp {
+  --btn-bg: linear-gradient(180deg, #25d366 0%, #16a34a 100%);
+  --btn-border: rgba(37, 211, 102, 0.52);
+  --btn-text: #fff;
 }
 
 .page {

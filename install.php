@@ -33,6 +33,8 @@ function defaultState(): array
             'organizerPhone' => '',
             'organizerImage' => '',
             'allowGuests' => false,
+            'whatsappGroupEnabled' => false,
+            'whatsappGroupUrl' => '',
             'description' => '',
             'createdAt' => gmdate('c'),
             'sessions' => []
