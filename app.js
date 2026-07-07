@@ -2,7 +2,7 @@ const STORAGE_KEY = "vem-presenca-studio-v2";
 const AUTH_KEY = "vem-presenca-admin-auth-v1";
 const API_ENDPOINT = "api.php";
 const APP_VERSION = "1.0.0";
-const APP_BUILD = "2026-07-07.15";
+const APP_BUILD = "2026-07-07.17";
 const GITHUB_REPO = "Lhsa050/cruzadamilagres";
 const GITHUB_BRANCH = "main";
 const THEME_OPTIONS = [
@@ -482,7 +482,7 @@ function render() {
   }
 
   if (route.name === "admin" && !isAdminAuthenticated()) {
-    renderLogin("Entre como administrador para acessar o painel.");
+    renderLogin();
     scrollTopOnRouteChange(shouldScrollTop);
     return;
   }
