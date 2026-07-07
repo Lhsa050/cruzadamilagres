@@ -4,13 +4,17 @@ const ADMIN_EMAIL = "admin@evento.local";
 const ADMIN_PASSWORD = "admin123";
 const API_ENDPOINT = "api.php";
 const APP_VERSION = "1.0.0";
-const APP_BUILD = "2026-07-07.10";
+const APP_BUILD = "2026-07-07.11";
 const GITHUB_REPO = "Lhsa050/cruzadamilagres";
 const GITHUB_BRANCH = "main";
 const THEME_OPTIONS = [
   { id: "light", label: "Claro", description: "Interface limpa e luminosa." },
   { id: "dark", label: "Escuro", description: "Mais contraste para uso noturno." },
   { id: "forest", label: "Amazônia", description: "Verde sofisticado e acolhedor." }
+];
+const BRAND_POSITION_OPTIONS = [
+  { id: "left", label: "Canto esquerdo", description: "Mantém a marca no padrão atual.", icon: "align-left" },
+  { id: "center", label: "Centro", description: "Centraliza a logo no cabeçalho.", icon: "align-center" }
 ];
 
 const DEFAULT_COVER =
@@ -284,6 +288,7 @@ function defaultSiteSettings() {
     activeCssFileId: "",
     brandName: "Vem Presença",
     logoUrl: "",
+    brandPosition: "left",
     theme: "light"
   };
 }
@@ -292,9 +297,14 @@ function validThemeId(value) {
   return THEME_OPTIONS.some((theme) => theme.id === value) ? value : "light";
 }
 
+function validBrandPosition(value) {
+  return BRAND_POSITION_OPTIONS.some((option) => option.id === value) ? value : "left";
+}
+
 function normalizeSiteSettings(site) {
   const settings = { ...defaultSiteSettings(), ...(site && typeof site === "object" ? site : {}) };
   settings.theme = validThemeId(settings.theme);
+  settings.brandPosition = validBrandPosition(settings.brandPosition);
   return settings;
 }
 
@@ -311,6 +321,10 @@ function logoUrl() {
   return siteSettings().logoUrl.trim();
 }
 
+function brandPosition() {
+  return validBrandPosition(siteSettings().brandPosition);
+}
+
 function renderBrandIdentity() {
   const name = brandName();
   const logo = logoUrl();
@@ -325,6 +339,19 @@ function renderBrandIdentity() {
 
 function renderBrandLink(href) {
   return `<a class="brand ${logoUrl() ? "has-logo" : ""}" href="${href}" aria-label="${escapeHtml(brandName() || "Vem Presença")}">${renderBrandIdentity()}</a>`;
+}
+
+function renderBrandPositionOptions(selectedPosition) {
+  return BRAND_POSITION_OPTIONS.map((option) => `
+    <label class="position-option ${selectedPosition === option.id ? "active" : ""}">
+      <input name="brandPosition" type="radio" value="${escapeHtml(option.id)}" ${selectedPosition === option.id ? "checked" : ""}>
+      <i data-lucide="${escapeHtml(option.icon)}"></i>
+      <span>
+        <strong>${escapeHtml(option.label)}</strong>
+        <small>${escapeHtml(option.description)}</small>
+      </span>
+    </label>
+  `).join("");
 }
 
 function applyTheme() {
@@ -476,7 +503,7 @@ function renderShell(content) {
   document.getElementById("app").innerHTML = `
     <div class="app-shell">
       <header class="topbar">
-        <div class="topbar-inner">
+        <div class="topbar-inner brand-${escapeHtml(brandPosition())}">
           ${renderBrandLink(admin ? "#/admin" : `#/evento/${encodeURIComponent(state.events[0]?.slug || "")}`)}
           <nav class="nav-actions" aria-label="Navegação">
             ${admin ? `<a class="btn ghost" href="#/admin"><i data-lucide="layout-dashboard"></i><span>Painel</span></a>` : ""}
@@ -917,7 +944,7 @@ function renderSettingsPanel() {
         <form id="site-settings-form" class="settings-grid">
           <div class="settings-preview">
             <span class="label">Prévia da marca</span>
-            <div class="brand-preview ${logoUrl() ? "has-logo" : ""}">
+            <div class="brand-preview ${logoUrl() ? "has-logo" : ""} brand-${escapeHtml(settings.brandPosition)}" data-brand-preview>
               ${renderBrandIdentity()}
             </div>
             <div class="logo-preview" data-logo-preview>
@@ -937,6 +964,12 @@ function renderSettingsPanel() {
               <input name="logoUrl" value="${escapeHtml(settings.logoUrl)}" placeholder="Cole uma URL ou importe uma imagem">
               <input name="logoFile" type="file" accept="image/*">
             </label>
+            <div class="field">
+              <span>Posição da marca no cabeçalho</span>
+              <div class="position-options">
+                ${renderBrandPositionOptions(settings.brandPosition)}
+              </div>
+            </div>
             <div class="field">
               <span>Tema do sistema</span>
               <div class="theme-options">
@@ -1081,6 +1114,7 @@ function bindSettingsPanel() {
     const settings = siteSettings();
     settings.brandName = String(formData.get("brandName") || "").trim();
     settings.logoUrl = String(formData.get("logoUrl") || "").trim();
+    settings.brandPosition = validBrandPosition(String(formData.get("brandPosition") || "left"));
     settings.theme = validThemeId(String(formData.get("theme") || "light"));
     saveState();
     toast("Configurações salvas.");
@@ -1117,6 +1151,16 @@ function bindSettingsPanel() {
     });
   });
 
+  form.querySelectorAll("input[name='brandPosition']").forEach((input) => {
+    input.addEventListener("change", () => {
+      const selectedPosition = validBrandPosition(input.value);
+      form.querySelectorAll(".position-option").forEach((option) => option.classList.remove("active"));
+      input.closest(".position-option")?.classList.add("active");
+      document.querySelector("[data-brand-preview]")?.classList.remove("brand-left", "brand-center");
+      document.querySelector("[data-brand-preview]")?.classList.add(`brand-${selectedPosition}`);
+    });
+  });
+
   document.querySelector("[data-action='clear-site-logo']")?.addEventListener("click", () => {
     const settings = siteSettings();
     settings.logoUrl = "";
@@ -1131,7 +1175,7 @@ function updateLogoPreview(value) {
   if (!target) return;
   const src = String(value || "").trim();
   target.innerHTML = src
-    ? `<img src="${escapeHtml(src)}" alt="${escapeHtml(brandName())}">`
+    ? `<img src="${escapeHtml(src)}" alt="${escapeHtml(brandName() || "Logo do cabeçalho")}">`
     : `<div class="logo-preview-empty"><i data-lucide="image"></i><span>Nenhuma logo importada</span></div>`;
   refreshIcons();
 }
@@ -1941,7 +1985,7 @@ function renderPublicEvent(event) {
   document.getElementById("app").innerHTML = `
     <main class="public-page">
       <header class="topbar">
-        <div class="topbar-inner">
+        <div class="topbar-inner brand-${escapeHtml(brandPosition())}">
           ${renderBrandLink(admin ? "#/admin" : `#/evento/${encodeURIComponent(event.slug)}`)}
           <nav class="nav-actions" aria-label="Navegação">
             ${admin ? `<a class="btn ghost" href="#/admin"><i data-lucide="settings"></i><span>Painel</span></a><button class="btn ghost" type="button" data-action="logout-admin"><i data-lucide="log-out"></i><span>Sair</span></button>` : ""}

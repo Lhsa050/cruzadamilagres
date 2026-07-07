@@ -167,6 +167,24 @@ img {
   margin: 0 auto;
 }
 
+.topbar-inner.brand-center {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto minmax(0, 1fr);
+}
+
+.topbar-inner.brand-center .brand {
+  grid-column: 2;
+  justify-self: center;
+  max-width: min(360px, 48vw);
+  justify-content: center;
+}
+
+.topbar-inner.brand-center .nav-actions {
+  grid-column: 3;
+  justify-self: end;
+  min-width: 0;
+}
+
 .brand {
   display: inline-flex;
   align-items: center;
@@ -1127,6 +1145,12 @@ input[type="color"] {
   font-weight: 900;
 }
 
+.brand-preview.brand-center {
+  display: flex;
+  justify-content: center;
+  width: 100%;
+}
+
 .logo-preview {
   display: grid;
   place-items: center;
@@ -1160,6 +1184,62 @@ input[type="color"] {
 .theme-options {
   display: grid;
   gap: 10px;
+}
+
+.position-options {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 10px;
+}
+
+.position-option {
+  display: grid;
+  grid-template-columns: 34px minmax(0, 1fr);
+  gap: 10px;
+  align-items: center;
+  min-height: 68px;
+  padding: 10px;
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  background: var(--panel-soft);
+  cursor: pointer;
+}
+
+.position-option input {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  opacity: 0;
+  pointer-events: none;
+}
+
+.position-option svg {
+  width: 19px;
+  height: 19px;
+  color: var(--primary);
+}
+
+.position-option.active,
+.position-option:has(input:checked) {
+  border-color: color-mix(in srgb, var(--primary) 45%, var(--line));
+  background: color-mix(in srgb, var(--primary) 10%, var(--surface));
+}
+
+.position-option strong,
+.position-option small {
+  display: block;
+}
+
+.position-option strong {
+  font-size: 13px;
+  font-weight: 900;
+}
+
+.position-option small {
+  margin-top: 2px;
+  color: var(--muted);
+  font-size: 12px;
+  line-height: 1.35;
 }
 
 .theme-option {
@@ -1690,6 +1770,15 @@ tr:last-child td {
 
   .topbar-inner {
     min-height: 58px;
+  }
+
+  .topbar-inner.brand-center {
+    grid-template-columns: minmax(36px, 1fr) auto minmax(36px, 1fr);
+    gap: 8px;
+  }
+
+  .topbar-inner.brand-center .brand-logo {
+    max-width: min(144px, 42vw);
   }
 
   .nav-actions .btn span,
