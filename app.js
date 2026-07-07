@@ -4,7 +4,7 @@ const ADMIN_EMAIL = "admin@evento.local";
 const ADMIN_PASSWORD = "admin123";
 const API_ENDPOINT = "api.php";
 const APP_VERSION = "1.0.0";
-const APP_BUILD = "2026-07-07.6";
+const APP_BUILD = "2026-07-07.7";
 const GITHUB_REPO = "Lhsa050/cruzadamilagres";
 const GITHUB_BRANCH = "main";
 
@@ -437,6 +437,7 @@ function scrollTopOnRouteChange(shouldScrollTop) {
 
 function renderShell(content) {
   const admin = isAdminAuthenticated();
+  const showEventShortcut = selectedEventId && (!admin || adminSection === "dashboard");
   document.getElementById("app").innerHTML = `
     <div class="app-shell">
       <header class="topbar">
@@ -444,7 +445,7 @@ function renderShell(content) {
           ${renderBrandLink(admin ? "#/admin" : `#/evento/${encodeURIComponent(state.events[0]?.slug || "")}`)}
           <nav class="nav-actions" aria-label="Navegação">
             ${admin ? `<a class="btn ghost" href="#/admin"><i data-lucide="layout-dashboard"></i><span>Painel</span></a>` : ""}
-            ${selectedEventId ? `<a class="btn" href="#/evento/${encodeURIComponent(eventById(selectedEventId)?.slug || "")}"><i data-lucide="external-link"></i><span>Página pública</span></a>` : ""}
+            ${showEventShortcut ? `<a class="btn" href="#/evento/${encodeURIComponent(eventById(selectedEventId)?.slug || "")}"><i data-lucide="external-link"></i><span>Página pública</span></a>` : ""}
             ${admin ? `<button class="btn ghost" type="button" data-action="logout-admin"><i data-lucide="log-out"></i><span>Sair</span></button>` : ""}
           </nav>
         </div>
@@ -542,7 +543,7 @@ function renderAdmin() {
             </div>
           </section>
 
-          <section class="sidebar-section">
+          <section class="sidebar-section" ${adminSection === "updates" ? "hidden" : ""}>
             <div class="sidebar-header">
               <h2 class="sidebar-title">Eventos</h2>
               <button class="btn icon small" type="button" data-action="new-event" title="Novo evento" aria-label="Novo evento">
