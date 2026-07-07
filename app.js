@@ -4,7 +4,7 @@ const ADMIN_EMAIL = "admin@evento.local";
 const ADMIN_PASSWORD = "admin123";
 const API_ENDPOINT = "api.php";
 const APP_VERSION = "1.0.0";
-const APP_BUILD = "2026-07-07.2";
+const APP_BUILD = "2026-07-07.3";
 const GITHUB_REPO = "Lhsa050/cruzadamilagres";
 const GITHUB_BRANCH = "main";
 
@@ -50,7 +50,6 @@ let currentModal = null;
 let activeRouteKey = "";
 let remotePersistenceReady = false;
 let remoteSaveTimer = null;
-applyActiveCss();
 
 function loadState() {
   try {
@@ -138,7 +137,6 @@ function seedState() {
 
 function saveState() {
   localStorage.setItem(STORAGE_KEY, JSON.stringify(state));
-  applyActiveCss();
   scheduleRemoteSave();
 }
 
@@ -194,7 +192,6 @@ async function loadRemoteStateIfAvailable() {
     state = normalizeStateShape(payload.state);
     selectedEventId = eventById(selectedEventId) ? selectedEventId : state.events[0]?.id || null;
     localStorage.setItem(STORAGE_KEY, JSON.stringify(state));
-    applyActiveCss();
 
     try {
       const session = await apiFetch("session");
@@ -272,48 +269,6 @@ function escapeHtml(value) {
 
 function imageSrc(value, fallback = BLANK_COVER) {
   return String(value || "").trim() || fallback;
-}
-
-function fileKind(file) {
-  const mime = String(file?.mime || "");
-  const name = String(file?.name || "").toLowerCase();
-  if (mime.startsWith("image/")) return "image";
-  if (mime.startsWith("text/") || /\.(css|html|js|json|txt|md)$/i.test(name)) return "text";
-  return "other";
-}
-
-function fileReference(file) {
-  return file?.data || file?.content || "";
-}
-
-function formatBytes(bytes = 0) {
-  const value = Number(bytes || 0);
-  if (value < 1024) return `${value} B`;
-  if (value < 1024 * 1024) return `${(value / 1024).toFixed(1)} KB`;
-  return `${(value / 1024 / 1024).toFixed(1)} MB`;
-}
-
-function activeCssFile() {
-  return state.files.find((file) => file.id === state.site?.activeCssFileId);
-}
-
-function isCssFile(file) {
-  return /\.css$/i.test(file?.name || "") || file?.mime === "text/css";
-}
-
-function applyActiveCss() {
-  let style = document.getElementById("admin-managed-css");
-  const file = activeCssFile();
-  if (!file || !isCssFile(file)) {
-    style?.remove();
-    return;
-  }
-  if (!style) {
-    style = document.createElement("style");
-    style.id = "admin-managed-css";
-    document.head.appendChild(style);
-  }
-  style.textContent = file.content || "";
 }
 
 function textToParagraphs(text) {
@@ -530,6 +485,7 @@ function renderAdmin() {
     createEvent();
     return;
   }
+  if (!["dashboard", "updates"].includes(adminSection)) adminSection = "dashboard";
   if (!selectedEventId || !eventById(selectedEventId)) selectedEventId = state.events[0].id;
   const event = eventById(selectedEventId);
   const participants = participantsForEvent(event.id);
@@ -568,10 +524,6 @@ function renderAdmin() {
               <button type="button" class="${adminSection === "dashboard" ? "active" : ""}" data-admin-section="dashboard">
                 <i data-lucide="layout-dashboard"></i>
                 <span>Painel</span>
-              </button>
-              <button type="button" class="${adminSection === "files" ? "active" : ""}" data-admin-section="files">
-                <i data-lucide="folder-open"></i>
-                <span>Gerenciador de arquivos</span>
               </button>
               <button type="button" class="${adminSection === "updates" ? "active" : ""}" data-admin-section="updates">
                 <i data-lucide="refresh-cw"></i>
@@ -763,9 +715,6 @@ function renderAdmin() {
           </section>
 
           </div>
-          <div class="admin-tab-panel" data-admin-panel="files" ${adminSection === "files" ? "" : "hidden"}>
-            ${renderFileManager(event)}
-          </div>
           <div class="admin-tab-panel" data-admin-panel="updates" ${adminSection === "updates" ? "" : "hidden"}>
             ${renderUpdateManager()}
           </div>
@@ -850,102 +799,6 @@ function renderParticipantsTable(event) {
         </tbody>
       </table>
     </div>
-  `;
-}
-
-function renderFileManager(event) {
-  const files = state.files || [];
-  const activeCss = activeCssFile();
-  return `
-    <section class="panel">
-      <div class="panel-header">
-        <div class="panel-title">
-          <h2>Gerenciador de arquivos</h2>
-          <p>Biblioteca para imagens, textos, CSS e pequenos ajustes do site.</p>
-        </div>
-        <div class="row-actions">
-          ${activeCss ? `<span class="badge success"><i data-lucide="palette"></i>CSS ativo: ${escapeHtml(activeCss.name)}</span>` : `<span class="badge"><i data-lucide="palette"></i>Sem CSS ativo</span>`}
-        </div>
-      </div>
-      <div class="panel-body content-stack">
-        <div class="file-manager-grid">
-          <div class="file-tool">
-            <h3>Importar arquivos</h3>
-            <p class="help-text">Use para capas, fotos do organizador, PDFs, textos e arquivos auxiliares. Imagens podem ser aplicadas direto no evento.</p>
-            <label class="drop-zone">
-              <input id="managed-file-upload" type="file" multiple>
-              <span><i data-lucide="upload-cloud"></i>Selecionar arquivos</span>
-            </label>
-          </div>
-
-          <form id="managed-file-form" class="file-tool">
-            <input name="fileId" type="hidden">
-            <h3>Criar ou editar arquivo</h3>
-            <div class="form-grid">
-              <label class="field">
-                <span>Nome do arquivo</span>
-                <input name="fileName" placeholder="ex.: custom.css">
-              </label>
-              <label class="field">
-                <span>Tipo</span>
-                <select name="fileMime">
-                  <option value="text/plain">Texto</option>
-                  <option value="text/css">CSS</option>
-                  <option value="text/html">HTML</option>
-                  <option value="application/javascript">JavaScript</option>
-                  <option value="application/json">JSON</option>
-                </select>
-              </label>
-              <label class="field full">
-                <span>Conteúdo</span>
-                <textarea name="fileContent" placeholder="Cole ou escreva o conteúdo aqui"></textarea>
-              </label>
-            </div>
-            <div class="button-row">
-              <button class="btn primary" type="submit"><i data-lucide="save"></i><span>Salvar arquivo</span></button>
-              <button class="btn" type="button" data-action="clear-file-editor"><i data-lucide="eraser"></i><span>Limpar</span></button>
-              ${activeCss ? `<button class="btn danger" type="button" data-action="clear-active-css"><i data-lucide="paintbrush-2"></i><span>Desativar CSS</span></button>` : ""}
-            </div>
-          </form>
-        </div>
-
-        ${files.length ? `
-          <div class="file-list">
-            ${files.map((file) => renderManagedFileCard(event, file)).join("")}
-          </div>
-        ` : `<div class="empty-state"><p>Nenhum arquivo na biblioteca ainda.</p></div>`}
-      </div>
-    </section>
-  `;
-}
-
-function renderManagedFileCard(event, file) {
-  const kind = fileKind(file);
-  const isImage = kind === "image";
-  const isText = kind === "text";
-  const css = isCssFile(file);
-  const active = state.site?.activeCssFileId === file.id;
-  return `
-    <article class="file-card">
-      <div class="file-preview ${isImage ? "" : "file-preview-icon"}">
-        ${isImage
-          ? `<img src="${escapeHtml(file.data)}" alt="${escapeHtml(file.name)}">`
-          : `<i data-lucide="${css ? "paintbrush" : isText ? "file-code-2" : "file"}"></i>`}
-      </div>
-      <div class="file-info">
-        <h3>${escapeHtml(file.name)}</h3>
-        <p>${escapeHtml(file.mime || "arquivo")} · ${formatBytes(file.size)}</p>
-        ${active ? `<span class="badge success">CSS aplicado no site</span>` : ""}
-      </div>
-      <div class="file-actions">
-        <button class="btn icon small" type="button" data-action="copy-file-ref" data-id="${file.id}" title="Copiar referência" aria-label="Copiar referência"><i data-lucide="copy"></i></button>
-        ${isImage ? `<button class="btn small" type="button" data-action="apply-file-cover" data-id="${file.id}"><i data-lucide="image"></i><span>Capa</span></button>` : ""}
-        ${isImage ? `<button class="btn small" type="button" data-action="apply-file-organizer" data-id="${file.id}"><i data-lucide="user-square-2"></i><span>Organizador</span></button>` : ""}
-        ${isText ? `<button class="btn small" type="button" data-action="edit-managed-file" data-id="${file.id}"><i data-lucide="pencil"></i><span>Editar</span></button>` : ""}
-        ${css ? `<button class="btn small ${active ? "danger" : ""}" type="button" data-action="toggle-active-css" data-id="${file.id}"><i data-lucide="palette"></i><span>${active ? "Desativar" : "Ativar CSS"}</span></button>` : ""}
-        <button class="btn icon small danger" type="button" data-action="delete-managed-file" data-id="${file.id}" title="Excluir arquivo" aria-label="Excluir arquivo"><i data-lucide="trash-2"></i></button>
-      </div>
-    </article>
   `;
 }
 
@@ -1060,58 +913,9 @@ function bindAdmin(event) {
   const eventForm = document.getElementById("event-form");
   bindImageImporter(eventForm, "coverFile", "coverUrl", ".preview-cover");
   bindImageImporter(eventForm, "organizerFile", "organizerImage");
-  bindFileManager(event);
   bindUpdateManager();
 
   refreshIcons();
-}
-
-function bindFileManager(event) {
-  document.getElementById("managed-file-upload")?.addEventListener("change", (inputEvent) => {
-    const files = Array.from(inputEvent.currentTarget.files || []);
-    if (!files.length) return;
-    importManagedFiles(files);
-  });
-
-  document.getElementById("managed-file-form")?.addEventListener("submit", (submitEvent) => {
-    submitEvent.preventDefault();
-    saveManagedTextFile(submitEvent.currentTarget);
-  });
-
-  document.querySelector("[data-action='clear-file-editor']")?.addEventListener("click", clearManagedFileEditor);
-  document.querySelector("[data-action='clear-active-css']")?.addEventListener("click", () => {
-    state.site.activeCssFileId = "";
-    saveState();
-    toast("CSS personalizado desativado.");
-    renderAdmin();
-  });
-
-  document.querySelectorAll("[data-action='copy-file-ref']").forEach((button) => {
-    button.addEventListener("click", () => {
-      const file = state.files.find((item) => item.id === button.dataset.id);
-      if (file) copyText(fileReference(file), "Referência do arquivo copiada.");
-    });
-  });
-
-  document.querySelectorAll("[data-action='apply-file-cover']").forEach((button) => {
-    button.addEventListener("click", () => applyManagedFileToEvent(event, button.dataset.id, "coverUrl"));
-  });
-
-  document.querySelectorAll("[data-action='apply-file-organizer']").forEach((button) => {
-    button.addEventListener("click", () => applyManagedFileToEvent(event, button.dataset.id, "organizerImage"));
-  });
-
-  document.querySelectorAll("[data-action='edit-managed-file']").forEach((button) => {
-    button.addEventListener("click", () => editManagedFile(button.dataset.id));
-  });
-
-  document.querySelectorAll("[data-action='toggle-active-css']").forEach((button) => {
-    button.addEventListener("click", () => toggleActiveCss(button.dataset.id));
-  });
-
-  document.querySelectorAll("[data-action='delete-managed-file']").forEach((button) => {
-    button.addEventListener("click", () => deleteManagedFile(button.dataset.id));
-  });
 }
 
 function bindUpdateManager() {
@@ -1174,150 +978,6 @@ async function runSystemUpdate() {
   } catch (error) {
     setUpdateStatus(escapeHtml(error.message || "Nao foi possivel atualizar."), "danger");
   }
-}
-
-function inferMimeFromName(name, fallback = "text/plain") {
-  const lower = String(name || "").toLowerCase();
-  if (lower.endsWith(".css")) return "text/css";
-  if (lower.endsWith(".html")) return "text/html";
-  if (lower.endsWith(".js")) return "application/javascript";
-  if (lower.endsWith(".json")) return "application/json";
-  if (lower.endsWith(".md")) return "text/markdown";
-  return fallback || "application/octet-stream";
-}
-
-function importManagedFiles(files) {
-  Promise.all(files.map(readManagedFile))
-    .then((items) => {
-      state.files = state.files || [];
-      state.files.unshift(...items);
-      saveState();
-      toast(`${items.length} arquivo(s) importado(s).`);
-      renderAdmin();
-    })
-    .catch(() => toast("Não foi possível importar um dos arquivos.", true));
-}
-
-function readManagedFile(file) {
-  return new Promise((resolve, reject) => {
-    const mime = inferMimeFromName(file.name, file.type);
-    const kind = fileKind({ name: file.name, mime });
-    const reader = new FileReader();
-    reader.addEventListener("error", reject);
-    reader.addEventListener("load", () => {
-      const base = {
-        id: "file_" + randomId(12),
-        name: file.name,
-        mime,
-        size: file.size,
-        createdAt: new Date().toISOString(),
-        updatedAt: new Date().toISOString()
-      };
-      if (kind === "text") {
-        resolve({ ...base, kind, content: String(reader.result || "") });
-        return;
-      }
-      resolve({ ...base, kind, data: String(reader.result || "") });
-    });
-    if (kind === "text") reader.readAsText(file);
-    else reader.readAsDataURL(file);
-  });
-}
-
-function saveManagedTextFile(form) {
-  const formData = new FormData(form);
-  const id = String(formData.get("fileId") || "");
-  const name = String(formData.get("fileName") || "").trim();
-  const mime = String(formData.get("fileMime") || "text/plain");
-  const content = String(formData.get("fileContent") || "");
-  if (!name) {
-    setFieldError(form.querySelector("input[name='fileName']"), "Informe o nome do arquivo.");
-    return;
-  }
-
-  state.files = state.files || [];
-  const existing = id ? state.files.find((file) => file.id === id) : null;
-  const size = new Blob([content]).size;
-  if (existing) {
-    Object.assign(existing, {
-      name,
-      mime,
-      kind: "text",
-      content,
-      size,
-      updatedAt: new Date().toISOString()
-    });
-    toast("Arquivo atualizado.");
-  } else {
-    state.files.unshift({
-      id: "file_" + randomId(12),
-      name,
-      mime,
-      kind: "text",
-      content,
-      size,
-      createdAt: new Date().toISOString(),
-      updatedAt: new Date().toISOString()
-    });
-    toast("Arquivo criado.");
-  }
-  saveState();
-  clearManagedFileEditor();
-  renderAdmin();
-}
-
-function clearManagedFileEditor() {
-  const form = document.getElementById("managed-file-form");
-  if (!form) return;
-  form.reset();
-  form.querySelector("input[name='fileId']").value = "";
-  form.querySelector("select[name='fileMime']").value = "text/plain";
-}
-
-function editManagedFile(id) {
-  const file = state.files.find((item) => item.id === id);
-  const form = document.getElementById("managed-file-form");
-  if (!file || !form) return;
-  form.querySelector("input[name='fileId']").value = file.id;
-  form.querySelector("input[name='fileName']").value = file.name || "";
-  form.querySelector("select[name='fileMime']").value = file.mime || inferMimeFromName(file.name);
-  form.querySelector("textarea[name='fileContent']").value = file.content || "";
-  form.scrollIntoView({ behavior: "smooth", block: "center" });
-}
-
-function applyManagedFileToEvent(event, id, field) {
-  const file = state.files.find((item) => item.id === id);
-  if (!file || fileKind(file) !== "image") {
-    toast("Selecione uma imagem da biblioteca.", true);
-    return;
-  }
-  event[field] = file.data;
-  saveState();
-  toast(field === "coverUrl" ? "Capa atualizada com arquivo da biblioteca." : "Imagem do organizador atualizada.");
-  renderAdmin();
-}
-
-function toggleActiveCss(id) {
-  const file = state.files.find((item) => item.id === id);
-  if (!file || !isCssFile(file)) {
-    toast("Selecione um arquivo CSS.", true);
-    return;
-  }
-  state.site.activeCssFileId = state.site.activeCssFileId === id ? "" : id;
-  saveState();
-  toast(state.site.activeCssFileId ? "CSS aplicado no site." : "CSS personalizado desativado.");
-  renderAdmin();
-}
-
-function deleteManagedFile(id) {
-  const file = state.files.find((item) => item.id === id);
-  if (!file) return;
-  if (!confirm(`Excluir o arquivo "${file.name}"?`)) return;
-  state.files = state.files.filter((item) => item.id !== id);
-  if (state.site?.activeCssFileId === id) state.site.activeCssFileId = "";
-  saveState();
-  toast("Arquivo excluído.");
-  renderAdmin();
 }
 
 function bindImageImporter(scope, fileName, inputName, previewSelector) {
