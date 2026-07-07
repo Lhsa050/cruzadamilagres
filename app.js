@@ -4,7 +4,7 @@ const ADMIN_EMAIL = "admin@evento.local";
 const ADMIN_PASSWORD = "admin123";
 const API_ENDPOINT = "api.php";
 const APP_VERSION = "1.0.0";
-const APP_BUILD = "2026-07-07.7";
+const APP_BUILD = "2026-07-07.8";
 const GITHUB_REPO = "Lhsa050/cruzadamilagres";
 const GITHUB_BRANCH = "main";
 
@@ -543,7 +543,7 @@ function renderAdmin() {
             </div>
           </section>
 
-          <section class="sidebar-section" ${adminSection === "updates" ? "hidden" : ""}>
+          <section class="sidebar-section" ${adminSection !== "dashboard" ? "hidden" : ""}>
             <div class="sidebar-header">
               <h2 class="sidebar-title">Eventos</h2>
               <button class="btn icon small" type="button" data-action="new-event" title="Novo evento" aria-label="Novo evento">

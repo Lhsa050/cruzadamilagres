@@ -437,6 +437,11 @@ img {
   min-width: 0;
 }
 
+.admin-tab-panel[hidden],
+.sidebar-section[hidden] {
+  display: none !important;
+}
+
 .page-heading {
   display: grid;
   gap: 18px;
