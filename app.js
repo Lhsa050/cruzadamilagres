@@ -4,7 +4,7 @@ const ADMIN_EMAIL = "admin@evento.local";
 const ADMIN_PASSWORD = "admin123";
 const API_ENDPOINT = "api.php";
 const APP_VERSION = "1.0.0";
-const APP_BUILD = "2026-07-07.12";
+const APP_BUILD = "2026-07-07.13";
 const GITHUB_REPO = "Lhsa050/cruzadamilagres";
 const GITHUB_BRANCH = "main";
 const THEME_OPTIONS = [
@@ -174,7 +174,7 @@ function logoutAdmin() {
   setAdminAuthenticated(false);
   remoteLogout();
   toast("Sessão encerrada.");
-  window.location.hash = `#/evento/${encodeURIComponent(state.events[0]?.slug || "")}`;
+  window.location.hash = "#/admin";
 }
 
 function canUseRemoteApi() {
@@ -422,9 +422,9 @@ function makeParticipant(event, data) {
 
 function getRoute() {
   const fallbackSlug = state.events[0]?.slug || "";
-  const hash = window.location.hash || (isAdminAuthenticated() ? "#/admin" : `#/evento/${fallbackSlug}`);
+  const hash = window.location.hash || "#/admin";
   const parts = hash.replace(/^#\/?/, "").split("/").filter(Boolean);
-  if (!parts.length) return isAdminAuthenticated() ? { name: "admin" } : { name: "event", slug: fallbackSlug };
+  if (!parts.length) return { name: "admin" };
   if (parts[0] === "admin") return { name: "admin" };
   if (parts[0] === "evento") return { name: "event", slug: decodeURIComponent(parts[1] || "") };
   if (parts[0] === "ticket") return { name: "ticket", id: decodeURIComponent(parts[1] || "") };
