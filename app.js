@@ -1,10 +1,8 @@
 const STORAGE_KEY = "vem-presenca-studio-v2";
 const AUTH_KEY = "vem-presenca-admin-auth-v1";
-const ADMIN_EMAIL = "admin@evento.local";
-const ADMIN_PASSWORD = "admin123";
 const API_ENDPOINT = "api.php";
 const APP_VERSION = "1.0.0";
-const APP_BUILD = "2026-07-07.13";
+const APP_BUILD = "2026-07-07.14";
 const GITHUB_REPO = "Lhsa050/cruzadamilagres";
 const GITHUB_BRANCH = "main";
 const THEME_OPTIONS = [
@@ -539,16 +537,12 @@ function renderLogin(message = "") {
             ${message ? `<div class="auth-message">${escapeHtml(message)}</div>` : ""}
             <label class="field">
               <span>E-mail</span>
-              <input name="email" type="email" inputmode="email" autocomplete="username" value="${ADMIN_EMAIL}" required>
+              <input name="email" type="email" inputmode="email" autocomplete="username" required>
             </label>
             <label class="field">
               <span>Senha</span>
-              <input name="password" type="password" autocomplete="current-password" value="${ADMIN_PASSWORD}" required>
+              <input name="password" type="password" autocomplete="current-password" required>
             </label>
-            <div class="credential-note">
-              <strong>Acesso de teste</strong>
-              <span>${escapeHtml(ADMIN_EMAIL)} · ${escapeHtml(ADMIN_PASSWORD)}</span>
-            </div>
             <div class="button-row">
               <button class="btn primary" type="submit"><i data-lucide="log-in"></i><span>Entrar</span></button>
               <a class="btn" href="#/evento/${encodeURIComponent(state.events[0]?.slug || "")}"><i data-lucide="eye"></i><span>Ver como convidado</span></a>
@@ -566,8 +560,7 @@ function renderLogin(message = "") {
     const email = normalizeEmail(formData.get("email"));
     const password = String(formData.get("password") || "");
     const remoteOk = await remoteLogin(email, password);
-    const localOk = email === ADMIN_EMAIL && password === ADMIN_PASSWORD;
-    if (remoteOk || (remoteOk === null && localOk)) {
+    if (remoteOk) {
       setAdminAuthenticated(true);
       toast("Bem-vindo ao painel.");
       window.location.hash = "#/admin";

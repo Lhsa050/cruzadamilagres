@@ -9,12 +9,9 @@ Protótipo estático para criação de eventos, confirmação de presença e emi
 - Página pública do evento: `#/evento/paul-enenche-brasil`
 - Ticket com QR Code: criado após uma confirmação de presença
 
-## Acesso de teste
+## Login administrativo
 
-- E-mail: `admin@evento.local`
-- Senha: `admin123`
-
-Na Hostinger, o e-mail e a senha são definidos em `install.php`.
+Na Hostinger, o e-mail e a senha do administrador são definidos em `install.php`.
 
 ## O que já funciona
 

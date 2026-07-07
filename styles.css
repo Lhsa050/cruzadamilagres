@@ -785,8 +785,7 @@ h3 {
   width: min(520px, 100%);
 }
 
-.auth-message,
-.credential-note {
+.auth-message {
   display: grid;
   gap: 4px;
   padding: 12px;
@@ -799,16 +798,6 @@ h3 {
   background: #fff8eb;
   color: var(--amber);
   font-weight: 800;
-}
-
-.credential-note {
-  border: 1px solid var(--line);
-  background: var(--panel-soft);
-  color: var(--muted-strong);
-}
-
-.credential-note strong {
-  color: var(--text);
 }
 
 .form-grid {
