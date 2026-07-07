@@ -2,7 +2,7 @@ const STORAGE_KEY = "vem-presenca-studio-v2";
 const AUTH_KEY = "vem-presenca-admin-auth-v1";
 const API_ENDPOINT = "api.php";
 const APP_VERSION = "1.0.0";
-const APP_BUILD = "2026-07-07.18";
+const APP_BUILD = "2026-07-07.19";
 const GITHUB_REPO = "Lhsa050/cruzadamilagres";
 const GITHUB_BRANCH = "main";
 const THEME_OPTIONS = [
@@ -1645,11 +1645,71 @@ function deleteEvent(event) {
     toast("Mantenha ao menos um evento.", true);
     return;
   }
-  if (!confirm(`Excluir "${event.title}" e seus participantes?`)) return;
+  const requiredPhrase = `Excluir ${event.title}`;
+  showModal(`
+    <div class="modal-header">
+      <div>
+        <p class="kicker">Excluir evento</p>
+        <h2>${escapeHtml(event.title)}</h2>
+      </div>
+      <button class="btn icon ghost" type="button" data-action="close-modal" aria-label="Fechar"><i data-lucide="x"></i></button>
+    </div>
+    <div class="modal-body">
+      <form id="delete-event-form" class="content-stack" novalidate>
+        <div class="delete-confirmation">
+          <strong>Esta ação remove o evento e todos os participantes dele.</strong>
+          <span>Para confirmar, digite exatamente:</span>
+          <code>${escapeHtml(requiredPhrase)}</code>
+        </div>
+        <label class="field">
+          <span>Confirmação</span>
+          <input name="deleteConfirmation" autocomplete="off" placeholder="${escapeHtml(requiredPhrase)}">
+        </label>
+        <div class="button-row">
+          <button class="btn" type="button" data-action="close-modal"><i data-lucide="x"></i><span>Cancelar</span></button>
+          <button class="btn danger" type="submit" disabled><i data-lucide="trash-2"></i><span>Excluir evento</span></button>
+        </div>
+      </form>
+    </div>
+  `);
+  bindDeleteEventConfirmation(event, requiredPhrase);
+}
+
+function bindDeleteEventConfirmation(event, requiredPhrase) {
+  const form = document.getElementById("delete-event-form");
+  const input = form?.querySelector("input[name='deleteConfirmation']");
+  const submitButton = form?.querySelector("button[type='submit']");
+  if (!form || !input || !submitButton) return;
+
+  const matchesPhrase = () => input.value.trim() === requiredPhrase;
+  const sync = () => {
+    clearFieldError(input);
+    submitButton.disabled = !matchesPhrase();
+  };
+
+  input.addEventListener("input", sync);
+  form.addEventListener("submit", (submitEvent) => {
+    submitEvent.preventDefault();
+    if (!matchesPhrase()) {
+      setFieldError(input, `Digite exatamente: ${requiredPhrase}`);
+      submitButton.disabled = true;
+      return;
+    }
+
+    performDeleteEvent(event);
+  });
+
+  sync();
+  input.focus();
+}
+
+function performDeleteEvent(event) {
   state.events = state.events.filter((item) => item.id !== event.id);
   state.participants = state.participants.filter((participant) => participant.eventId !== event.id);
   selectedEventId = state.events[0].id;
   saveState();
+  closeModal();
+  toast("Evento excluído.");
   renderAdmin();
 }
 
