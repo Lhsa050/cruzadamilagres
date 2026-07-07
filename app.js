@@ -4,7 +4,7 @@ const ADMIN_EMAIL = "admin@evento.local";
 const ADMIN_PASSWORD = "admin123";
 const API_ENDPOINT = "api.php";
 const APP_VERSION = "1.0.0";
-const APP_BUILD = "2026-07-07.3";
+const APP_BUILD = "2026-07-07.4";
 const GITHUB_REPO = "Lhsa050/cruzadamilagres";
 const GITHUB_BRANCH = "main";
 
@@ -497,6 +497,14 @@ function renderAdmin() {
     <main class="page">
       <div class="admin-layout">
         <aside class="sidebar" aria-label="Eventos">
+          <section class="admin-profile">
+            <div class="admin-profile-mark"><i data-lucide="shield-check"></i></div>
+            <div>
+              <strong>Vem Presença</strong>
+              <span>Administração</span>
+            </div>
+          </section>
+
           <section class="sidebar-section">
             <div class="sidebar-header">
               <h2 class="sidebar-title">Eventos</h2>
@@ -548,22 +556,34 @@ function renderAdmin() {
             </div>
             <div class="stat-grid">
               <div class="stat">
-                <div class="stat-label">Confirmados</div>
+                <div class="stat-top">
+                  <div class="stat-label">Confirmados</div>
+                  <span class="stat-icon green"><i data-lucide="users"></i></span>
+                </div>
                 <div class="stat-value">${participants.length}</div>
                 <div class="stat-note">inscrições registradas</div>
               </div>
               <div class="stat">
-                <div class="stat-label">Check-ins</div>
+                <div class="stat-top">
+                  <div class="stat-label">Check-ins</div>
+                  <span class="stat-icon blue"><i data-lucide="badge-check"></i></span>
+                </div>
                 <div class="stat-value">${checked}</div>
                 <div class="stat-note">${participants.length ? Math.round((checked / participants.length) * 100) : 0}% presentes</div>
               </div>
               <div class="stat">
-                <div class="stat-label">Capacidade</div>
+                <div class="stat-top">
+                  <div class="stat-label">Capacidade</div>
+                  <span class="stat-icon amber"><i data-lucide="armchair"></i></span>
+                </div>
                 <div class="stat-value">${capacity || "-"}</div>
                 <div class="stat-note">vagas configuradas</div>
               </div>
               <div class="stat">
-                <div class="stat-label">Sessões</div>
+                <div class="stat-top">
+                  <div class="stat-label">Sessões</div>
+                  <span class="stat-icon violet"><i data-lucide="calendar-range"></i></span>
+                </div>
                 <div class="stat-value">${event.sessions.length}</div>
                 <div class="stat-note">opções no formulário</div>
               </div>
