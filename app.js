@@ -4,7 +4,7 @@ const ADMIN_EMAIL = "admin@evento.local";
 const ADMIN_PASSWORD = "admin123";
 const API_ENDPOINT = "api.php";
 const APP_VERSION = "1.0.0";
-const APP_BUILD = "2026-07-07.1";
+const APP_BUILD = "2026-07-07.2";
 const GITHUB_REPO = "Lhsa050/cruzadamilagres";
 const GITHUB_BRANCH = "main";
 
@@ -45,6 +45,7 @@ const sampleDescription = [
 let state = loadState();
 let selectedEventId = state.events[0]?.id || null;
 let adminFilters = { q: "", session: "all", status: "all" };
+let adminSection = "dashboard";
 let currentModal = null;
 let activeRouteKey = "";
 let remotePersistenceReady = false;
@@ -559,9 +560,29 @@ function renderAdmin() {
               `).join("")}
             </div>
           </section>
+          <section class="sidebar-section">
+            <div class="sidebar-header">
+              <h2 class="sidebar-title">Menu</h2>
+            </div>
+            <div class="admin-tabs">
+              <button type="button" class="${adminSection === "dashboard" ? "active" : ""}" data-admin-section="dashboard">
+                <i data-lucide="layout-dashboard"></i>
+                <span>Painel</span>
+              </button>
+              <button type="button" class="${adminSection === "files" ? "active" : ""}" data-admin-section="files">
+                <i data-lucide="folder-open"></i>
+                <span>Gerenciador de arquivos</span>
+              </button>
+              <button type="button" class="${adminSection === "updates" ? "active" : ""}" data-admin-section="updates">
+                <i data-lucide="refresh-cw"></i>
+                <span>Atualizar sistema</span>
+              </button>
+            </div>
+          </section>
         </aside>
 
         <div class="content-stack">
+          <div class="content-stack admin-tab-panel" data-admin-panel="dashboard" ${adminSection === "dashboard" ? "" : "hidden"}>
           <section class="page-heading">
             <div class="page-heading-main">
               <div>
@@ -741,8 +762,13 @@ function renderAdmin() {
             </div>
           </section>
 
-          ${renderFileManager(event)}
-          ${renderUpdateManager()}
+          </div>
+          <div class="admin-tab-panel" data-admin-panel="files" ${adminSection === "files" ? "" : "hidden"}>
+            ${renderFileManager(event)}
+          </div>
+          <div class="admin-tab-panel" data-admin-panel="updates" ${adminSection === "updates" ? "" : "hidden"}>
+            ${renderUpdateManager()}
+          </div>
         </div>
       </div>
     </main>
@@ -965,6 +991,13 @@ function renderUpdateManager() {
 }
 
 function bindAdmin(event) {
+  document.querySelectorAll("[data-admin-section]").forEach((button) => {
+    button.addEventListener("click", () => {
+      adminSection = button.dataset.adminSection || "dashboard";
+      renderAdmin();
+    });
+  });
+
   document.querySelectorAll("[data-action='select-event']").forEach((button) => {
     button.addEventListener("click", () => {
       selectedEventId = button.dataset.id;

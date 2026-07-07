@@ -307,6 +307,40 @@ img {
   white-space: nowrap;
 }
 
+.admin-tabs {
+  display: grid;
+  gap: 6px;
+  padding: 8px;
+}
+
+.admin-tabs button {
+  display: grid;
+  grid-template-columns: 28px minmax(0, 1fr);
+  align-items: center;
+  gap: 10px;
+  width: 100%;
+  min-height: 42px;
+  padding: 8px 10px;
+  border: 1px solid transparent;
+  border-radius: var(--radius);
+  background: transparent;
+  color: var(--muted-strong);
+  text-align: left;
+  font-weight: 850;
+}
+
+.admin-tabs button:hover,
+.admin-tabs button.active {
+  border-color: var(--line);
+  background: var(--surface-soft);
+  color: var(--surface-strong);
+}
+
+.admin-tabs svg {
+  width: 18px;
+  height: 18px;
+}
+
 .content-stack {
   display: grid;
   gap: 20px;
