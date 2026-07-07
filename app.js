@@ -4,7 +4,7 @@ const ADMIN_EMAIL = "admin@evento.local";
 const ADMIN_PASSWORD = "admin123";
 const API_ENDPOINT = "api.php";
 const APP_VERSION = "1.0.0";
-const APP_BUILD = "2026-07-07.9";
+const APP_BUILD = "2026-07-07.10";
 const GITHUB_REPO = "Lhsa050/cruzadamilagres";
 const GITHUB_BRANCH = "main";
 const THEME_OPTIONS = [
@@ -304,7 +304,7 @@ function siteSettings() {
 }
 
 function brandName() {
-  return siteSettings().brandName.trim() || "Vem Presença";
+  return siteSettings().brandName.trim();
 }
 
 function logoUrl() {
@@ -314,16 +314,17 @@ function logoUrl() {
 function renderBrandIdentity() {
   const name = brandName();
   const logo = logoUrl();
+  const fallbackName = "Vem Presença";
   return `
     ${logo
-      ? `<img class="brand-logo" src="${escapeHtml(logo)}" alt="${escapeHtml(name)}">`
+      ? `<img class="brand-logo" src="${escapeHtml(logo)}" alt="${escapeHtml(name || fallbackName)}">`
       : `<span class="brand-mark"><i data-lucide="qr-code"></i></span>`}
-    <span>${escapeHtml(name)}</span>
+    ${name ? `<span>${escapeHtml(name)}</span>` : (!logo ? `<span>${escapeHtml(fallbackName)}</span>` : "")}
   `;
 }
 
 function renderBrandLink(href) {
-  return `<a class="brand ${logoUrl() ? "has-logo" : ""}" href="${href}" aria-label="${escapeHtml(brandName())}">${renderBrandIdentity()}</a>`;
+  return `<a class="brand ${logoUrl() ? "has-logo" : ""}" href="${href}" aria-label="${escapeHtml(brandName() || "Vem Presença")}">${renderBrandIdentity()}</a>`;
 }
 
 function applyTheme() {
@@ -564,15 +565,16 @@ function renderAdmin() {
   const checked = participants.filter((participant) => participant.checkInAt).length;
   const capacity = getEventCapacity(event);
   const selectedSession = event.sessions[0]?.id || "";
+  const adminName = brandName() || "Painel administrativo";
 
   renderShell(`
     <main class="page">
       <div class="admin-layout">
         <aside class="sidebar" aria-label="Eventos">
           <section class="admin-profile">
-            <div class="admin-profile-mark">${logoUrl() ? `<img src="${escapeHtml(logoUrl())}" alt="${escapeHtml(brandName())}">` : `<i data-lucide="shield-check"></i>`}</div>
+            <div class="admin-profile-mark">${logoUrl() ? `<img src="${escapeHtml(logoUrl())}" alt="${escapeHtml(adminName)}">` : `<i data-lucide="shield-check"></i>`}</div>
             <div>
-              <strong>${escapeHtml(brandName())}</strong>
+              <strong>${escapeHtml(adminName)}</strong>
               <span>Administração</span>
             </div>
           </section>
@@ -920,7 +922,7 @@ function renderSettingsPanel() {
             </div>
             <div class="logo-preview" data-logo-preview>
               ${settings.logoUrl
-                ? `<img src="${escapeHtml(settings.logoUrl)}" alt="${escapeHtml(brandName())}">`
+                ? `<img src="${escapeHtml(settings.logoUrl)}" alt="${escapeHtml(brandName() || "Logo do cabeçalho")}">`
                 : `<div class="logo-preview-empty"><i data-lucide="image"></i><span>Nenhuma logo importada</span></div>`}
             </div>
           </div>
@@ -1077,7 +1079,7 @@ function bindSettingsPanel() {
     submitEvent.preventDefault();
     const formData = new FormData(form);
     const settings = siteSettings();
-    settings.brandName = String(formData.get("brandName") || "").trim() || "Vem Presença";
+    settings.brandName = String(formData.get("brandName") || "").trim();
     settings.logoUrl = String(formData.get("logoUrl") || "").trim();
     settings.theme = validThemeId(String(formData.get("theme") || "light"));
     saveState();
