@@ -4,9 +4,14 @@ const ADMIN_EMAIL = "admin@evento.local";
 const ADMIN_PASSWORD = "admin123";
 const API_ENDPOINT = "api.php";
 const APP_VERSION = "1.0.0";
-const APP_BUILD = "2026-07-07.8";
+const APP_BUILD = "2026-07-07.9";
 const GITHUB_REPO = "Lhsa050/cruzadamilagres";
 const GITHUB_BRANCH = "main";
+const THEME_OPTIONS = [
+  { id: "light", label: "Claro", description: "Interface limpa e luminosa." },
+  { id: "dark", label: "Escuro", description: "Mais contraste para uso noturno." },
+  { id: "forest", label: "Amazônia", description: "Verde sofisticado e acolhedor." }
+];
 
 const DEFAULT_COVER =
   "https://sgowpqlitfuoybtihojo.supabase.co/storage/v1/object/public/event-images/paul-enenche-brasil/capa-1776970008064.jpeg";
@@ -50,6 +55,7 @@ let currentModal = null;
 let activeRouteKey = "";
 let remotePersistenceReady = false;
 let remoteSaveTimer = null;
+applyTheme();
 
 function loadState() {
   try {
@@ -137,6 +143,7 @@ function seedState() {
 
 function saveState() {
   localStorage.setItem(STORAGE_KEY, JSON.stringify(state));
+  applyTheme();
   scheduleRemoteSave();
 }
 
@@ -192,6 +199,7 @@ async function loadRemoteStateIfAvailable() {
     state = normalizeStateShape(payload.state);
     selectedEventId = eventById(selectedEventId) ? selectedEventId : state.events[0]?.id || null;
     localStorage.setItem(STORAGE_KEY, JSON.stringify(state));
+    applyTheme();
 
     try {
       const session = await apiFetch("session");
@@ -275,12 +283,19 @@ function defaultSiteSettings() {
   return {
     activeCssFileId: "",
     brandName: "Vem Presença",
-    logoUrl: ""
+    logoUrl: "",
+    theme: "light"
   };
 }
 
+function validThemeId(value) {
+  return THEME_OPTIONS.some((theme) => theme.id === value) ? value : "light";
+}
+
 function normalizeSiteSettings(site) {
-  return { ...defaultSiteSettings(), ...(site && typeof site === "object" ? site : {}) };
+  const settings = { ...defaultSiteSettings(), ...(site && typeof site === "object" ? site : {}) };
+  settings.theme = validThemeId(settings.theme);
+  return settings;
 }
 
 function siteSettings() {
@@ -309,6 +324,25 @@ function renderBrandIdentity() {
 
 function renderBrandLink(href) {
   return `<a class="brand ${logoUrl() ? "has-logo" : ""}" href="${href}" aria-label="${escapeHtml(brandName())}">${renderBrandIdentity()}</a>`;
+}
+
+function applyTheme() {
+  const theme = validThemeId(state?.site?.theme);
+  document.documentElement.dataset.theme = theme;
+  document.documentElement.style.colorScheme = theme === "dark" ? "dark" : "light";
+}
+
+function renderThemeOptions(selectedTheme) {
+  return THEME_OPTIONS.map((theme) => `
+    <label class="theme-option ${selectedTheme === theme.id ? "active" : ""}">
+      <input name="theme" type="radio" value="${escapeHtml(theme.id)}" ${selectedTheme === theme.id ? "checked" : ""}>
+      <span class="theme-swatch ${escapeHtml(theme.id)}"></span>
+      <span>
+        <strong>${escapeHtml(theme.label)}</strong>
+        <small>${escapeHtml(theme.description)}</small>
+      </span>
+    </label>
+  `).join("");
 }
 
 function textToParagraphs(text) {
@@ -901,6 +935,12 @@ function renderSettingsPanel() {
               <input name="logoUrl" value="${escapeHtml(settings.logoUrl)}" placeholder="Cole uma URL ou importe uma imagem">
               <input name="logoFile" type="file" accept="image/*">
             </label>
+            <div class="field">
+              <span>Tema do sistema</span>
+              <div class="theme-options">
+                ${renderThemeOptions(settings.theme)}
+              </div>
+            </div>
             <div class="button-row">
               <button class="btn primary" type="submit"><i data-lucide="save"></i><span>Salvar configurações</span></button>
               <button class="btn danger" type="button" data-action="clear-site-logo"><i data-lucide="eraser"></i><span>Remover logo</span></button>
@@ -1039,6 +1079,7 @@ function bindSettingsPanel() {
     const settings = siteSettings();
     settings.brandName = String(formData.get("brandName") || "").trim() || "Vem Presença";
     settings.logoUrl = String(formData.get("logoUrl") || "").trim();
+    settings.theme = validThemeId(String(formData.get("theme") || "light"));
     saveState();
     toast("Configurações salvas.");
     renderAdmin();
@@ -1063,6 +1104,15 @@ function bindSettingsPanel() {
       updateLogoPreview(value);
     });
     reader.readAsDataURL(file);
+  });
+
+  form.querySelectorAll("input[name='theme']").forEach((input) => {
+    input.addEventListener("change", () => {
+      document.documentElement.dataset.theme = validThemeId(input.value);
+      document.documentElement.style.colorScheme = input.value === "dark" ? "dark" : "light";
+      form.querySelectorAll(".theme-option").forEach((option) => option.classList.remove("active"));
+      input.closest(".theme-option")?.classList.add("active");
+    });
   });
 
   document.querySelector("[data-action='clear-site-logo']")?.addEventListener("click", () => {
@@ -1885,7 +1935,6 @@ function renderPublicEvent(event) {
   const available = capacity ? Math.max(capacity - participants.length, 0) : null;
   const hasSessions = event.sessions.length > 0;
   const admin = isAdminAuthenticated();
-  document.documentElement.style.setProperty("--primary", event.accent || "#0f766e");
 
   document.getElementById("app").innerHTML = `
     <main class="public-page">
@@ -2018,7 +2067,6 @@ function renderTicket(participant) {
     url: getTicketUrl(participant)
   });
 
-  document.documentElement.style.setProperty("--primary", event.accent || "#0f766e");
   document.getElementById("app").innerHTML = `
     <main class="ticket-page">
       <div class="ticket-wrap">
