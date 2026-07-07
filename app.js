@@ -4,7 +4,7 @@ const ADMIN_EMAIL = "admin@evento.local";
 const ADMIN_PASSWORD = "admin123";
 const API_ENDPOINT = "api.php";
 const APP_VERSION = "1.0.0";
-const APP_BUILD = "2026-07-07.4";
+const APP_BUILD = "2026-07-07.5";
 const GITHUB_REPO = "Lhsa050/cruzadamilagres";
 const GITHUB_BRANCH = "main";
 
@@ -1792,8 +1792,8 @@ function renderPublicEvent(event) {
           <div class="side-block">
             <button class="btn primary" type="button" data-action="open-rsvp" ${hasSessions ? "" : "disabled"}><i data-lucide="ticket-check"></i><span>${hasSessions ? "Confirmar presença" : "Sem sessões"}</span></button>
             <div class="badge-row">
-              <span class="badge success"><i data-lucide="users"></i>${participants.length} confirmados</span>
-              ${available !== null ? `<span class="badge"><i data-lucide="armchair"></i>${available} vagas</span>` : ""}
+              ${admin ? `<span class="badge success"><i data-lucide="users"></i>${participants.length} confirmados</span>` : ""}
+              ${admin && available !== null ? `<span class="badge"><i data-lucide="armchair"></i>${available} vagas</span>` : ""}
               ${event.allowGuests ? `<span class="badge"><i data-lucide="user-plus"></i>convidado liberado</span>` : ""}
             </div>
           </div>
@@ -1815,7 +1815,7 @@ function renderPublicEvent(event) {
                 return `
                   <div class="session-pill">
                     <strong>${escapeHtml(session.label)}</strong>
-                    <span>${used}/${session.capacity || "sem limite"} confirmados${session.private ? " · reservada" : ""}</span>
+                    <span>${admin ? `${used}/${session.capacity || "sem limite"} confirmados${session.private ? " · reservada" : ""}` : `${session.private ? "Sessão reservada" : "Inscrição disponível"}`}</span>
                   </div>
                 `;
               }).join("") : `<div class="session-pill"><strong>Nenhuma sessão cadastrada</strong><span>Cadastre uma sessão no painel para abrir inscrições.</span></div>`}
