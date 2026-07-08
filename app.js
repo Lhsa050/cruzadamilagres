@@ -2,7 +2,7 @@ const STORAGE_KEY = "vem-presenca-studio-v2";
 const AUTH_KEY = "vem-presenca-admin-auth-v1";
 const API_ENDPOINT = "api.php";
 const APP_VERSION = "1.0.0";
-const APP_BUILD = "2026-07-07.19";
+const APP_BUILD = "2026-07-08.1";
 const GITHUB_REPO = "Lhsa050/cruzadamilagres";
 const GITHUB_BRANCH = "main";
 const THEME_OPTIONS = [
@@ -289,6 +289,8 @@ function defaultSiteSettings() {
     brandName: "Vem Presença",
     logoUrl: "",
     brandPosition: "left",
+    homeMode: "login",
+    homeEventId: "",
     theme: "light"
   };
 }
@@ -301,10 +303,16 @@ function validBrandPosition(value) {
   return BRAND_POSITION_OPTIONS.some((option) => option.id === value) ? value : "left";
 }
 
+function validHomeMode(value) {
+  return ["login", "event"].includes(value) ? value : "login";
+}
+
 function normalizeSiteSettings(site) {
   const settings = { ...defaultSiteSettings(), ...(site && typeof site === "object" ? site : {}) };
   settings.theme = validThemeId(settings.theme);
   settings.brandPosition = validBrandPosition(settings.brandPosition);
+  settings.homeMode = validHomeMode(settings.homeMode);
+  settings.homeEventId = String(settings.homeEventId || "");
   return settings;
 }
 
@@ -352,6 +360,49 @@ function renderBrandPositionOptions(selectedPosition) {
       </span>
     </label>
   `).join("");
+}
+
+function renderHomeModeOptions(selectedMode) {
+  const options = [
+    { id: "login", label: "Página de login", description: "O domínio abre a entrada do administrador.", icon: "log-in" },
+    { id: "event", label: "Evento", description: "O domínio abre um evento público escolhido.", icon: "calendar-days" }
+  ];
+  return options.map((option) => `
+    <label class="position-option ${selectedMode === option.id ? "active" : ""}">
+      <input name="homeMode" type="radio" value="${escapeHtml(option.id)}" ${selectedMode === option.id ? "checked" : ""}>
+      <i data-lucide="${escapeHtml(option.icon)}"></i>
+      <span>
+        <strong>${escapeHtml(option.label)}</strong>
+        <small>${escapeHtml(option.description)}</small>
+      </span>
+    </label>
+  `).join("");
+}
+
+function renderHomeEventOptions(selectedEventId) {
+  const fallbackId = selectedEventId || state.events[0]?.id || "";
+  return state.events.map((event) => `
+    <option value="${escapeHtml(event.id)}" ${fallbackId === event.id ? "selected" : ""}>${escapeHtml(event.title || event.slug)}</option>
+  `).join("");
+}
+
+function selectedHomeEvent(settings = siteSettings()) {
+  return eventById(settings.homeEventId) || state.events[0] || null;
+}
+
+function defaultHomeRoute() {
+  const settings = siteSettings();
+  if (settings.homeMode === "event") {
+    const event = selectedHomeEvent(settings);
+    if (event) return { name: "event", slug: event.slug };
+  }
+  return { name: "admin" };
+}
+
+function defaultHomeHash() {
+  const route = defaultHomeRoute();
+  if (route.name === "event") return `#/evento/${encodeURIComponent(route.slug)}`;
+  return "#/admin";
 }
 
 function applyTheme() {
@@ -421,14 +472,14 @@ function makeParticipant(event, data) {
 }
 
 function getRoute() {
-  const fallbackSlug = state.events[0]?.slug || "";
-  const hash = window.location.hash || "#/admin";
+  const hash = window.location.hash;
+  if (!hash || hash === "#" || hash === "#/") return defaultHomeRoute();
   const parts = hash.replace(/^#\/?/, "").split("/").filter(Boolean);
-  if (!parts.length) return { name: "admin" };
+  if (!parts.length) return defaultHomeRoute();
   if (parts[0] === "admin") return { name: "admin" };
   if (parts[0] === "evento") return { name: "event", slug: decodeURIComponent(parts[1] || "") };
   if (parts[0] === "ticket") return { name: "ticket", id: decodeURIComponent(parts[1] || "") };
-  return isAdminAuthenticated() ? { name: "admin" } : { name: "event", slug: fallbackSlug };
+  return isAdminAuthenticated() ? { name: "admin" } : defaultHomeRoute();
 }
 
 function eventById(id) {
@@ -520,7 +571,7 @@ function renderShell(content) {
     <div class="app-shell">
       <header class="topbar">
         <div class="topbar-inner brand-${escapeHtml(brandPosition())}">
-          ${renderBrandLink(admin ? "#/admin" : `#/evento/${encodeURIComponent(state.events[0]?.slug || "")}`)}
+          ${renderBrandLink(admin ? "#/admin" : defaultHomeHash())}
           <nav class="nav-actions" aria-label="Navegação">
             ${admin ? `<a class="btn ghost" href="#/admin"><i data-lucide="layout-dashboard"></i><span>Painel</span></a>` : ""}
             ${admin ? `<button class="btn ghost" type="button" data-action="logout-admin"><i data-lucide="log-out"></i><span>Sair</span></button>` : ""}
@@ -995,6 +1046,19 @@ function renderSettingsPanel() {
                 ${renderThemeOptions(settings.theme)}
               </div>
             </div>
+            <div class="field">
+              <span>Página inicial do domínio</span>
+              <div class="position-options home-options">
+                ${renderHomeModeOptions(settings.homeMode)}
+              </div>
+            </div>
+            <label class="field" data-home-event-field>
+              <span>Evento inicial</span>
+              <select name="homeEventId">
+                ${renderHomeEventOptions(settings.homeEventId)}
+              </select>
+              <p class="help-text">Usado somente quando a página inicial estiver configurada como evento.</p>
+            </label>
             <div class="button-row">
               <button class="btn primary" type="submit"><i data-lucide="save"></i><span>Salvar configurações</span></button>
               <button class="btn danger" type="button" data-action="clear-site-logo"><i data-lucide="eraser"></i><span>Remover logo</span></button>
@@ -1135,6 +1199,11 @@ function bindSettingsPanel() {
     settings.brandName = String(formData.get("brandName") || "").trim();
     settings.logoUrl = String(formData.get("logoUrl") || "").trim();
     settings.brandPosition = validBrandPosition(String(formData.get("brandPosition") || "left"));
+    settings.homeMode = validHomeMode(String(formData.get("homeMode") || "login"));
+    settings.homeEventId = String(formData.get("homeEventId") || "").trim();
+    if (settings.homeMode === "event" && !eventById(settings.homeEventId)) {
+      settings.homeEventId = state.events[0]?.id || "";
+    }
     settings.theme = validThemeId(String(formData.get("theme") || "light"));
     saveState();
     toast("Configurações salvas.");
@@ -1181,6 +1250,17 @@ function bindSettingsPanel() {
     });
   });
 
+  form.querySelectorAll("input[name='homeMode']").forEach((input) => {
+    input.addEventListener("change", () => {
+      const selectedMode = validHomeMode(input.value);
+      form.querySelectorAll("input[name='homeMode']").forEach((optionInput) => {
+        optionInput.closest(".position-option")?.classList.toggle("active", optionInput.checked);
+      });
+      syncHomeEventSelector(form, selectedMode);
+    });
+  });
+  syncHomeEventSelector(form, validHomeMode(new FormData(form).get("homeMode")));
+
   document.querySelector("[data-action='clear-site-logo']")?.addEventListener("click", () => {
     const settings = siteSettings();
     settings.logoUrl = "";
@@ -1198,6 +1278,14 @@ function updateLogoPreview(value) {
     ? `<img src="${escapeHtml(src)}" alt="${escapeHtml(brandName() || "Logo do cabeçalho")}">`
     : `<div class="logo-preview-empty"><i data-lucide="image"></i><span>Nenhuma logo importada</span></div>`;
   refreshIcons();
+}
+
+function syncHomeEventSelector(form, mode) {
+  const field = form?.querySelector("[data-home-event-field]");
+  const select = form?.querySelector("select[name='homeEventId']");
+  const enabled = validHomeMode(mode) === "event";
+  field?.classList.toggle("disabled", !enabled);
+  if (select) select.disabled = !enabled;
 }
 
 function bindUpdateManager() {
@@ -1706,6 +1794,11 @@ function bindDeleteEventConfirmation(event, requiredPhrase) {
 function performDeleteEvent(event) {
   state.events = state.events.filter((item) => item.id !== event.id);
   state.participants = state.participants.filter((participant) => participant.eventId !== event.id);
+  const settings = siteSettings();
+  if (settings.homeEventId === event.id) {
+    settings.homeEventId = state.events[0]?.id || "";
+    if (!settings.homeEventId && settings.homeMode === "event") settings.homeMode = "login";
+  }
   selectedEventId = state.events[0].id;
   saveState();
   closeModal();

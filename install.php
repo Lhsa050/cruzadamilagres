@@ -41,7 +41,7 @@ function defaultState(): array
         ]],
         'participants' => [],
         'files' => [],
-        'site' => ['activeCssFileId' => '']
+        'site' => ['activeCssFileId' => '', 'homeMode' => 'login', 'homeEventId' => '']
     ];
 }
 
