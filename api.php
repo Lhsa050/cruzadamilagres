@@ -44,6 +44,49 @@ function readJsonFile(string $path): array
     return is_array($data) ? $data : [];
 }
 
+function writeStateFile(string $path, array $state): void
+{
+    $json = json_encode($state, JSON_PRETTY_PRINT | JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES);
+    if ($json === false || file_put_contents($path, $json, LOCK_EX) === false) {
+        respond(['ok' => false, 'error' => 'Nao foi possivel salvar state.json.'], 500);
+    }
+}
+
+function normalizeEmailValue($value): string
+{
+    return strtolower(trim((string)$value));
+}
+
+function normalizePhoneValue($value): string
+{
+    $digits = preg_replace('/\D+/', '', (string)$value) ?: '';
+    if (substr($digits, 0, 2) === '55' && (strlen($digits) === 12 || strlen($digits) === 13)) {
+        $digits = substr($digits, 2);
+    }
+    return $digits;
+}
+
+function validPhoneValue(string $digits): bool
+{
+    return strlen($digits) === 10 || strlen($digits) === 11;
+}
+
+function formatPhoneValue(string $digits): string
+{
+    if (strlen($digits) === 11) {
+        return sprintf('(%s) %s-%s', substr($digits, 0, 2), substr($digits, 2, 5), substr($digits, 7));
+    }
+    if (strlen($digits) === 10) {
+        return sprintf('(%s) %s-%s', substr($digits, 0, 2), substr($digits, 2, 4), substr($digits, 6));
+    }
+    return $digits;
+}
+
+function randomToken(int $length): string
+{
+    return substr(strtolower(bin2hex(random_bytes(max(8, $length)))), 0, $length);
+}
+
 function fetchUrl(string $url)
 {
     $context = stream_context_create([
@@ -250,6 +293,110 @@ if ($action === 'session') {
     respond(['ok' => true, 'admin' => !empty($_SESSION['admin'])]);
 }
 
+if ($action === 'register_participant') {
+    if ($_SERVER['REQUEST_METHOD'] !== 'POST') {
+        respond(['ok' => false, 'error' => 'Metodo nao permitido.'], 405);
+    }
+
+    $body = readBody();
+    $input = is_array($body['participant'] ?? null) ? $body['participant'] : [];
+    $eventId = trim((string)($body['eventId'] ?? ''));
+    $state = readJsonFile($stateFile);
+    $state['events'] = is_array($state['events'] ?? null) ? $state['events'] : [];
+    $state['participants'] = is_array($state['participants'] ?? null) ? $state['participants'] : [];
+
+    $event = null;
+    foreach ($state['events'] as $candidate) {
+        if ((string)($candidate['id'] ?? '') === $eventId) {
+            $event = is_array($candidate) ? $candidate : null;
+            break;
+        }
+    }
+
+    if (!$event) {
+        respond(['ok' => false, 'error' => 'Evento nao encontrado.'], 404);
+    }
+
+    $name = trim((string)($input['name'] ?? ''));
+    $email = normalizeEmailValue($input['email'] ?? '');
+    $phoneDigits = normalizePhoneValue($input['phone'] ?? '');
+    $city = trim((string)($input['city'] ?? ''));
+    $guestName = trim((string)($input['guestName'] ?? ''));
+    $sessionId = trim((string)($input['sessionId'] ?? ''));
+
+    if ($name === '') {
+        respond(['ok' => false, 'error' => 'Informe o nome completo.', 'field' => 'name'], 422);
+    }
+    if (!filter_var($email, FILTER_VALIDATE_EMAIL)) {
+        respond(['ok' => false, 'error' => 'Informe um e-mail valido.', 'field' => 'email'], 422);
+    }
+    if (!validPhoneValue($phoneDigits)) {
+        respond(['ok' => false, 'error' => 'Informe um telefone valido com DDD.', 'field' => 'phone'], 422);
+    }
+
+    $sessions = is_array($event['sessions'] ?? null) ? $event['sessions'] : [];
+    $session = null;
+    foreach ($sessions as $candidate) {
+        if ((string)($candidate['id'] ?? '') === $sessionId) {
+            $session = is_array($candidate) ? $candidate : null;
+            break;
+        }
+    }
+    if (!$session) {
+        respond(['ok' => false, 'error' => 'Selecione uma sessao valida.', 'field' => 'sessionId'], 422);
+    }
+
+    foreach ($state['participants'] as $participant) {
+        if (!is_array($participant) || (string)($participant['eventId'] ?? '') !== $eventId) {
+            continue;
+        }
+        if (normalizeEmailValue($participant['email'] ?? '') === $email) {
+            respond(['ok' => false, 'error' => 'Este e-mail ja esta inscrito neste evento.', 'field' => 'email'], 409);
+        }
+        if (normalizePhoneValue($participant['phone'] ?? '') === $phoneDigits) {
+            respond(['ok' => false, 'error' => 'Este telefone ja esta inscrito neste evento.', 'field' => 'phone'], 409);
+        }
+    }
+
+    $capacity = (int)($session['capacity'] ?? 0);
+    if ($capacity > 0) {
+        $used = 0;
+        foreach ($state['participants'] as $participant) {
+            if (is_array($participant)
+                && (string)($participant['eventId'] ?? '') === $eventId
+                && (string)($participant['sessionId'] ?? '') === $sessionId) {
+                $used++;
+            }
+        }
+        if ($used >= $capacity) {
+            respond(['ok' => false, 'error' => 'Sessao sem vagas disponiveis.', 'field' => 'sessionId'], 409);
+        }
+    }
+
+    if (empty($event['allowGuests'])) {
+        $guestName = '';
+    }
+
+    $participant = [
+        'id' => 'part_' . randomToken(14),
+        'eventId' => $eventId,
+        'ticketCode' => 'VP-' . strtoupper(randomToken(9)),
+        'name' => $name,
+        'email' => $email,
+        'phone' => formatPhoneValue($phoneDigits),
+        'city' => $city,
+        'guestName' => $guestName,
+        'sessionId' => $sessionId,
+        'status' => 'confirmed',
+        'createdAt' => date(DATE_ATOM),
+        'checkInAt' => null,
+    ];
+
+    $state['participants'][] = $participant;
+    writeStateFile($stateFile, $state);
+    respond(['ok' => true, 'participant' => $participant]);
+}
+
 if ($action === 'check_update') {
     requireAdmin();
     $local = readJsonFile($versionFile);
@@ -295,11 +442,7 @@ if ($action === 'state') {
             respond(['ok' => false, 'error' => 'Estado invalido.'], 422);
         }
 
-        $json = json_encode($body['state'], JSON_PRETTY_PRINT | JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES);
-        if ($json === false || file_put_contents($stateFile, $json, LOCK_EX) === false) {
-            respond(['ok' => false, 'error' => 'Nao foi possivel salvar state.json.'], 500);
-        }
-
+        writeStateFile($stateFile, $body['state']);
         respond(['ok' => true]);
     }
 }

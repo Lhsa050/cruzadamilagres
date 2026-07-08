@@ -2,7 +2,7 @@ const STORAGE_KEY = "vem-presenca-studio-v2";
 const AUTH_KEY = "vem-presenca-admin-auth-v1";
 const API_ENDPOINT = "api.php";
 const APP_VERSION = "1.0.0";
-const APP_BUILD = "2026-07-08.2";
+const APP_BUILD = "2026-07-08.3";
 const GITHUB_REPO = "Lhsa050/cruzadamilagres";
 const GITHUB_BRANCH = "main";
 const THEME_OPTIONS = [
@@ -189,7 +189,10 @@ async function apiFetch(action, options = {}) {
   });
   const payload = await response.json().catch(() => ({}));
   if (!response.ok || payload.ok === false) {
-    throw new Error(payload.error || "Falha na API.");
+    const error = new Error(payload.error || "Falha na API.");
+    error.status = response.status;
+    error.payload = payload;
+    throw error;
   }
   return payload;
 }
@@ -207,7 +210,7 @@ async function loadRemoteStateIfAvailable() {
 
     try {
       const session = await apiFetch("session");
-      if (session.admin) setAdminAuthenticated(true);
+      setAdminAuthenticated(Boolean(session.admin));
     } catch {
       // Session check is optional for local fallback.
     }
@@ -218,7 +221,7 @@ async function loadRemoteStateIfAvailable() {
 }
 
 function scheduleRemoteSave() {
-  if (!remotePersistenceReady || !canUseRemoteApi()) return;
+  if (!remotePersistenceReady || !canUseRemoteApi() || !isAdminAuthenticated()) return;
   window.clearTimeout(remoteSaveTimer);
   remoteSaveTimer = window.setTimeout(() => {
     apiFetch("state", {
@@ -2050,16 +2053,22 @@ function bindParticipantWizard(event, form, onComplete) {
     });
   });
 
-  form.addEventListener("submit", (submitEvent) => {
+  form.addEventListener("submit", async (submitEvent) => {
     submitEvent.preventDefault();
     if (!validateParticipantForm(form, { includeSession: true, includeGuest: allowGuests })) {
       const invalidStep = form.querySelector("[aria-invalid='true']")?.closest("[data-step-panel]")?.dataset.stepPanel;
       if (invalidStep) setWizardStep(form, Number(invalidStep));
       return;
     }
-    const participant = createParticipantFromForm(event, form);
-    if (!participant) return;
-    onComplete(participant);
+    const submitButton = form.querySelector("button[type='submit']");
+    submitButton?.setAttribute("disabled", "disabled");
+    try {
+      const participant = await createParticipantFromForm(event, form);
+      if (!participant) return;
+      onComplete(participant);
+    } finally {
+      submitButton?.removeAttribute("disabled");
+    }
   });
 
   updateGuestFieldVisibility(form);
@@ -2209,7 +2218,51 @@ function formatPhone(value) {
   return String(value || "").trim();
 }
 
-function createParticipantFromForm(event, form) {
+function cacheStateLocally() {
+  localStorage.setItem(STORAGE_KEY, JSON.stringify(state));
+  applyTheme();
+}
+
+function applyParticipantServerError(form, error) {
+  const field = error?.payload?.field;
+  const message = error?.message || "Nao foi possivel salvar sua confirmacao. Tente novamente.";
+  if (field) {
+    const input = form.querySelector(`[name='${field}']`);
+    setFieldError(input, message);
+    const invalidStep = input?.closest("[data-step-panel]")?.dataset.stepPanel;
+    if (invalidStep) setWizardStep(form, Number(invalidStep));
+  }
+  toast(message, true);
+}
+
+function storeParticipantFromServer(event, participant) {
+  state.participants = state.participants.filter((item) => {
+    if (item.id === participant.id) return false;
+    if (item.eventId !== event.id) return true;
+    return normalizeEmail(item.email) !== normalizeEmail(participant.email)
+      && normalizePhone(item.phone) !== normalizePhone(participant.phone);
+  });
+  state.participants.push(participant);
+  cacheStateLocally();
+}
+
+async function savePublicParticipant(event, data, form) {
+  try {
+    const payload = await apiFetch("register_participant", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ eventId: event.id, participant: data })
+    });
+    if (!payload.participant) throw new Error("Confirmacao sem participante retornado.");
+    storeParticipantFromServer(event, payload.participant);
+    return payload.participant;
+  } catch (error) {
+    applyParticipantServerError(form, error);
+    return null;
+  }
+}
+
+async function createParticipantFromForm(event, form) {
   const formData = new FormData(form);
   const sessionId = formData.get("sessionId");
   const session = sessionById(event, sessionId);
@@ -2219,6 +2272,8 @@ function createParticipantFromForm(event, form) {
   }
   const email = normalizeEmail(formData.get("email"));
   const phone = normalizePhone(formData.get("phone"));
+  const usePublicServerSave = remotePersistenceReady && canUseRemoteApi() && !isAdminAuthenticated();
+  if (!usePublicServerSave) {
   const duplicate = participantsForEvent(event.id).find((participant) => {
     return normalizeEmail(participant.email) === email || normalizePhone(participant.phone) === phone;
   });
@@ -2237,14 +2292,20 @@ function createParticipantFromForm(event, form) {
     return null;
   }
 
-  const participant = makeParticipant(event, {
+  }
+
+  const participantData = {
     name: formData.get("name"),
     email,
     phone: formatPhone(formData.get("phone")),
     city: formData.get("city"),
     guestName: formData.get("guestChoice") === "yes" ? formData.get("guestName") : "",
     sessionId
-  });
+  };
+
+  if (usePublicServerSave) return savePublicParticipant(event, participantData, form);
+
+  const participant = makeParticipant(event, participantData);
   state.participants.push(participant);
   saveState();
   return participant;
