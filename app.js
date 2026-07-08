@@ -2,7 +2,7 @@ const STORAGE_KEY = "vem-presenca-studio-v2";
 const AUTH_KEY = "vem-presenca-admin-auth-v1";
 const API_ENDPOINT = "api.php";
 const APP_VERSION = "1.0.0";
-const APP_BUILD = "2026-07-08.5";
+const APP_BUILD = "2026-07-08.6";
 const GITHUB_REPO = "Lhsa050/cruzadamilagres";
 const GITHUB_BRANCH = "main";
 const THEME_OPTIONS = [
@@ -555,8 +555,12 @@ function participantsForEvent(eventId) {
   return state.participants.filter((participant) => participant.eventId === eventId);
 }
 
+function participantGuestCount(participant) {
+  return String(participant?.guestName || "").trim() ? 1 : 0;
+}
+
 function participantHeadcount(participant) {
-  return String(participant?.guestName || "").trim() ? 2 : 1;
+  return 1 + participantGuestCount(participant);
 }
 
 function participantsHeadcount(participants) {
@@ -1053,6 +1057,7 @@ function renderParticipantsTable(event) {
         <thead>
           <tr>
             <th>Participante</th>
+            <th>Convidados</th>
             <th>Sessão</th>
             <th>Código</th>
             <th>Status</th>
@@ -1063,12 +1068,18 @@ function renderParticipantsTable(event) {
         <tbody>
           ${filtered.map((participant) => {
             const session = sessionById(event, participant.sessionId);
+            const guestCount = participantGuestCount(participant);
+            const peopleCount = participantHeadcount(participant);
             return `
               <tr>
                 <td>
                   <div class="participant-name">${escapeHtml(participant.name)}</div>
                   <div class="muted">${escapeHtml(participant.email)} · ${escapeHtml(participant.phone)}</div>
                   ${participant.guestName ? `<div class="muted">Convidado: ${escapeHtml(participant.guestName)}</div>` : ""}
+                </td>
+                <td>
+                  <span class="badge ${guestCount ? "success" : ""}">${guestCount}</span>
+                  <div class="muted">Total: ${peopleCount} pessoa${peopleCount > 1 ? "s" : ""}</div>
                 </td>
                 <td>${escapeHtml(session?.label || "Sessão removida")}</td>
                 <td class="mono">${escapeHtml(participant.ticketCode)}</td>
@@ -2660,6 +2671,8 @@ function exportCsv(event) {
       telefone: participant.phone,
       cidade: participant.city,
       convidado: participant.guestName || "",
+      numero_convidados: participantGuestCount(participant),
+      total_pessoas: participantHeadcount(participant),
       sessao: session?.label || "",
       codigo: participant.ticketCode,
       status: participant.checkInAt ? "presente" : "confirmado",
@@ -2674,6 +2687,8 @@ function exportCsv(event) {
     telefone: "",
     cidade: "",
     convidado: "",
+    numero_convidados: "",
+    total_pessoas: "",
     sessao: "",
     codigo: "",
     status: "",
