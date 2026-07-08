@@ -2,7 +2,7 @@ const STORAGE_KEY = "vem-presenca-studio-v2";
 const AUTH_KEY = "vem-presenca-admin-auth-v1";
 const API_ENDPOINT = "api.php";
 const APP_VERSION = "1.0.0";
-const APP_BUILD = "2026-07-08.7";
+const APP_BUILD = "2026-07-08.8";
 const GITHUB_REPO = "Lhsa050/cruzadamilagres";
 const GITHUB_BRANCH = "main";
 const THEME_OPTIONS = [
@@ -106,6 +106,7 @@ function seedState() {
     organizerName: "Pr. Pedro Medina",
     organizerPhone: "(47) 99122-2131",
     organizerImage: DEFAULT_ORGANIZER,
+    rsvpButtonLabel: "Confirmar presença",
     allowGuests: false,
     whatsappGroupEnabled: false,
     whatsappGroupUrl: "",
@@ -535,6 +536,10 @@ function eventScheduleText(event) {
     gates ? `Abertura às ${gates}` : "",
     time ? `Evento às ${time}` : ""
   ].filter(Boolean).join(" · ");
+}
+
+function eventRsvpButtonLabel(event) {
+  return String(event?.rsvpButtonLabel || "").trim() || "Confirmar presença";
 }
 
 function normalizeEmail(value) {
@@ -970,6 +975,10 @@ function renderAdmin() {
                     <span>Imagem do organizador</span>
                     <input name="organizerImage" value="${escapeHtml(event.organizerImage)}" placeholder="Cole uma URL ou importe uma imagem">
                     <input name="organizerFile" type="file" accept="image/*">
+                  </label>
+                  <label class="field full">
+                    <span>Texto do botão de inscrição</span>
+                    <input name="rsvpButtonLabel" value="${escapeHtml(eventRsvpButtonLabel(event))}" maxlength="40" placeholder="Ex.: Garantir minha vaga">
                   </label>
                   <label class="checkbox-label field full">
                     <input name="allowGuests" type="checkbox" ${event.allowGuests ? "checked" : ""}>
@@ -1576,6 +1585,7 @@ function saveEventFromForm(event, form) {
     organizerName: formData.get("organizerName").trim(),
     organizerPhone: formData.get("organizerPhone").trim(),
     organizerImage: formData.get("organizerImage").trim(),
+    rsvpButtonLabel: String(formData.get("rsvpButtonLabel") || "").trim() || "Confirmar presença",
     allowGuests: formData.get("allowGuests") === "on",
     whatsappGroupEnabled: formData.get("whatsappGroupEnabled") === "on",
     whatsappGroupUrl: String(formData.get("whatsappGroupUrl") || "").trim(),
@@ -1696,6 +1706,11 @@ function eventCreationFormHtml() {
       </div>
 
       <div class="form-step" data-step-panel="3" hidden>
+        <label class="field full">
+          <span>Texto do botão de inscrição</span>
+          <input name="rsvpButtonLabel" maxlength="40" value="Confirmar presença" placeholder="Ex.: Garantir minha vaga">
+        </label>
+
         <label class="checkbox-label">
           <input name="allowGuests" type="checkbox">
           Permitir que o participante leve convidado
@@ -1800,6 +1815,7 @@ function bindEventCreationWizard(form) {
       organizerName: formData.get("organizerName").trim(),
       organizerPhone: formData.get("organizerPhone").trim(),
       organizerImage: formData.get("organizerImage").trim(),
+      rsvpButtonLabel: String(formData.get("rsvpButtonLabel") || "").trim() || "Confirmar presença",
       allowGuests: formData.get("allowGuests") === "on",
       whatsappGroupEnabled: formData.get("whatsappGroupEnabled") === "on",
       whatsappGroupUrl: String(formData.get("whatsappGroupUrl") || "").trim(),
@@ -1990,6 +2006,7 @@ function openParticipantModal(event) {
 function participantFormHtml(event, id) {
   const allowGuests = Boolean(event.allowGuests);
   const confirmStep = allowGuests ? 3 : 2;
+  const submitLabel = eventRsvpButtonLabel(event);
   return `
     <form id="${id}" class="content-stack participant-wizard" data-step="1" data-allow-guests="${allowGuests}" novalidate>
       <div class="wizard-progress ${allowGuests ? "three" : ""}" aria-label="Etapas da confirmação">
@@ -2092,7 +2109,7 @@ function participantFormHtml(event, id) {
 
         <div class="button-row">
           <button class="btn" type="button" data-action="wizard-back"><i data-lucide="arrow-left"></i><span>Voltar</span></button>
-          <button class="btn primary" type="submit"><i data-lucide="ticket-check"></i><span>Confirmar presença</span></button>
+          <button class="btn primary" type="submit"><i data-lucide="ticket-check"></i><span>${escapeHtml(submitLabel)}</span></button>
         </div>
       </div>
     </form>
@@ -2408,6 +2425,7 @@ function renderPublicEvent(event) {
   const hasSessions = event.sessions.length > 0;
   const admin = isAdminAuthenticated();
   const scheduleText = eventScheduleText(event);
+  const rsvpButtonLabel = eventRsvpButtonLabel(event);
 
   document.getElementById("app").innerHTML = `
     <main class="public-page">
@@ -2455,7 +2473,7 @@ function renderPublicEvent(event) {
 
         <aside class="event-side">
           <div class="side-block">
-            <button class="btn primary" type="button" data-action="open-rsvp" ${hasSessions ? "" : "disabled"}><i data-lucide="ticket-check"></i><span>${hasSessions ? "Confirmar presença" : "Sem sessões"}</span></button>
+            <button class="btn primary" type="button" data-action="open-rsvp" ${hasSessions ? "" : "disabled"}><i data-lucide="ticket-check"></i><span>${hasSessions ? escapeHtml(rsvpButtonLabel) : "Sem sessões"}</span></button>
             <div class="badge-row">
               ${admin ? `<span class="badge success"><i data-lucide="users"></i>${confirmedPeople} confirmados</span>` : ""}
               ${admin && available !== null ? `<span class="badge"><i data-lucide="armchair"></i>${available} vagas</span>` : ""}
@@ -2495,7 +2513,7 @@ function renderPublicEvent(event) {
             <div class="sticky-cta-title">${escapeHtml(event.title)}</div>
             <div class="sticky-cta-sub">${escapeHtml(event.dateLabel)} · ${escapeHtml(event.locationName)}</div>
           </div>
-          <button class="btn primary" type="button" data-action="open-rsvp" ${hasSessions ? "" : "disabled"}><i data-lucide="ticket-check"></i><span>${hasSessions ? "Confirmar presença" : "Sem sessões"}</span></button>
+          <button class="btn primary" type="button" data-action="open-rsvp" ${hasSessions ? "" : "disabled"}><i data-lucide="ticket-check"></i><span>${hasSessions ? escapeHtml(rsvpButtonLabel) : "Sem sessões"}</span></button>
         </div>
       </div>
     </main>
