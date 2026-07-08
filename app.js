@@ -2,7 +2,7 @@ const STORAGE_KEY = "vem-presenca-studio-v2";
 const AUTH_KEY = "vem-presenca-admin-auth-v1";
 const API_ENDPOINT = "api.php";
 const APP_VERSION = "1.0.0";
-const APP_BUILD = "2026-07-08.3";
+const APP_BUILD = "2026-07-08.4";
 const GITHUB_REPO = "Lhsa050/cruzadamilagres";
 const GITHUB_BRANCH = "main";
 const THEME_OPTIONS = [
@@ -57,6 +57,7 @@ let currentModal = null;
 let activeRouteKey = "";
 let remotePersistenceReady = false;
 let remoteSaveTimer = null;
+let authRevision = 0;
 applyTheme();
 
 function loadState() {
@@ -163,6 +164,7 @@ function isAdminAuthenticated() {
 }
 
 function setAdminAuthenticated(authenticated) {
+  authRevision++;
   if (authenticated) {
     localStorage.setItem(AUTH_KEY, JSON.stringify({ authenticated: true, at: new Date().toISOString() }));
     return;
@@ -181,8 +183,12 @@ function canUseRemoteApi() {
   return location.protocol === "http:" || location.protocol === "https:";
 }
 
+function apiUrl(action) {
+  return `${appBasePath()}${API_ENDPOINT}?action=${encodeURIComponent(action)}`;
+}
+
 async function apiFetch(action, options = {}) {
-  const response = await fetch(`${API_ENDPOINT}?action=${encodeURIComponent(action)}`, {
+  const response = await fetch(apiUrl(action), {
     credentials: "same-origin",
     cache: "no-store",
     ...options
@@ -209,8 +215,11 @@ async function loadRemoteStateIfAvailable() {
     applyTheme();
 
     try {
+      const sessionAuthRevision = authRevision;
       const session = await apiFetch("session");
-      setAdminAuthenticated(Boolean(session.admin));
+      if (session.admin || sessionAuthRevision === authRevision) {
+        setAdminAuthenticated(Boolean(session.admin));
+      }
     } catch {
       // Session check is optional for local fallback.
     }
@@ -235,7 +244,7 @@ function scheduleRemoteSave() {
 async function remoteLogin(email, password) {
   if (!canUseRemoteApi()) return false;
   try {
-    const response = await fetch(`${API_ENDPOINT}?action=login`, {
+    const response = await fetch(apiUrl("login"), {
       credentials: "same-origin",
       cache: "no-store",
       method: "POST",
@@ -446,6 +455,15 @@ function navigateToAdmin() {
     return;
   }
   window.location.hash = "#/admin";
+}
+
+function redirectToAdmin() {
+  if (canUseRemoteApi()) {
+    window.location.assign(adminHref());
+    return;
+  }
+  window.location.hash = "#/admin";
+  render();
 }
 
 function applyTheme() {
@@ -679,7 +697,7 @@ function renderLogin(message = "") {
     if (remoteOk) {
       setAdminAuthenticated(true);
       toast("Bem-vindo ao painel.");
-      navigateToAdmin();
+      redirectToAdmin();
       return;
     }
     setFieldError(form.querySelector("input[name='email']"), "Confira o e-mail.");
