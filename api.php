@@ -27,6 +27,11 @@ function readBody(): array
     return is_array($data) ? $data : [];
 }
 
+function htmlEscape(string $value): string
+{
+    return htmlspecialchars($value, ENT_QUOTES, 'UTF-8');
+}
+
 function requireAdmin(): void
 {
     if (empty($_SESSION['admin'])) {
@@ -90,6 +95,103 @@ function randomToken(int $length): string
 function participantHeadcountValue(array $participant): int
 {
     return trim((string)($participant['guestName'] ?? '')) !== '' ? 2 : 1;
+}
+
+function absoluteAppUrl(string $path = ''): string
+{
+    $https = (!empty($_SERVER['HTTPS']) && $_SERVER['HTTPS'] !== 'off') || (($_SERVER['HTTP_X_FORWARDED_PROTO'] ?? '') === 'https');
+    $scheme = $https ? 'https' : 'http';
+    $host = $_SERVER['HTTP_HOST'] ?? 'localhost';
+    $scriptDir = str_replace('\\', '/', dirname($_SERVER['SCRIPT_NAME'] ?? '/'));
+    $base = rtrim($scriptDir === '/' ? '' : $scriptDir, '/');
+    return "{$scheme}://{$host}{$base}/" . ltrim($path, '/');
+}
+
+function logoPreviewUrl(array $state): string
+{
+    $site = is_array($state['site'] ?? null) ? $state['site'] : [];
+    $logo = trim((string)($site['logoUrl'] ?? ''));
+    if ($logo === '') {
+        return '';
+    }
+    if (preg_match('#^https?://#i', $logo)) {
+        return $logo;
+    }
+    if (substr($logo, 0, 11) === 'data:image/') {
+        return absoluteAppUrl('api.php?action=site_logo');
+    }
+    return absoluteAppUrl($logo);
+}
+
+function renderAppPage(array $state): void
+{
+    $title = 'Confirme sua presença | IEQ São Joaquim';
+    $logoUrl = logoPreviewUrl($state);
+
+    header('Content-Type: text/html; charset=utf-8', true);
+    echo '<!doctype html>
+<html lang="pt-BR">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <meta name="theme-color" content="#0f766e" />
+    <title>' . htmlEscape($title) . '</title>
+    <meta name="description" content="' . htmlEscape($title) . '" />
+    <meta property="og:type" content="website" />
+    <meta property="og:title" content="' . htmlEscape($title) . '" />
+    <meta property="og:description" content="' . htmlEscape($title) . '" />
+    <meta property="og:url" content="' . htmlEscape(absoluteAppUrl()) . '" />';
+    if ($logoUrl !== '') {
+        echo '
+    <meta property="og:image" content="' . htmlEscape($logoUrl) . '" />
+    <meta property="og:image:alt" content="Logo IEQ São Joaquim" />
+    <meta name="twitter:card" content="summary_large_image" />
+    <meta name="twitter:image" content="' . htmlEscape($logoUrl) . '" />
+    <link rel="icon" href="' . htmlEscape($logoUrl) . '" />
+    <link rel="apple-touch-icon" href="' . htmlEscape($logoUrl) . '" />';
+    }
+    echo '
+    <link rel="preconnect" href="https://cdn.jsdelivr.net" />
+    <link rel="preconnect" href="https://unpkg.com" />
+    <link rel="stylesheet" href="./styles.css?v=37" />
+    <script defer src="https://cdn.jsdelivr.net/npm/qrcodejs@1.0.0/qrcode.min.js"></script>
+    <script defer src="https://unpkg.com/lucide@latest/dist/umd/lucide.min.js"></script>
+    <script defer src="./app.js?v=37"></script>
+  </head>
+  <body>
+    <div id="app"></div>
+  </body>
+</html>';
+    exit;
+}
+
+function respondSiteLogo(array $state): void
+{
+    $site = is_array($state['site'] ?? null) ? $state['site'] : [];
+    $logo = trim((string)($site['logoUrl'] ?? ''));
+
+    if ($logo === '') {
+        respond(['ok' => false, 'error' => 'Logo nao configurada.'], 404);
+    }
+
+    if (preg_match('#^https?://#i', $logo)) {
+        header('Location: ' . $logo, true, 302);
+        exit;
+    }
+
+    if (!preg_match('#^data:(image/(?:png|jpe?g|gif|webp|svg\+xml));base64,(.+)$#s', $logo, $matches)) {
+        respond(['ok' => false, 'error' => 'Logo invalida.'], 404);
+    }
+
+    $content = base64_decode($matches[2], true);
+    if ($content === false) {
+        respond(['ok' => false, 'error' => 'Logo invalida.'], 404);
+    }
+
+    header('Content-Type: ' . $matches[1], true);
+    header('Cache-Control: public, max-age=3600', true);
+    echo $content;
+    exit;
 }
 
 function fetchUrl(string $url)
@@ -193,6 +295,7 @@ function runGithubUpdate(string $zipUrl): array
         '.htaccess',
         'api.php',
         'app.js',
+        'index.php',
         'index.html',
         'install.php',
         'INSTALAR-HOSTINGER.md',
@@ -264,6 +367,10 @@ if ($action === 'status') {
     respond(['ok' => true, 'installed' => file_exists($configFile)]);
 }
 
+if ($action === 'page') {
+    renderAppPage(readJsonFile($stateFile));
+}
+
 if (!file_exists($configFile)) {
     respond(['ok' => false, 'error' => 'Aplicacao ainda nao instalada. Abra install.php.'], 503);
 }
@@ -296,6 +403,10 @@ if ($action === 'logout') {
 
 if ($action === 'session') {
     respond(['ok' => true, 'admin' => !empty($_SESSION['admin'])]);
+}
+
+if ($action === 'site_logo') {
+    respondSiteLogo(readJsonFile($stateFile));
 }
 
 if ($action === 'register_participant') {
