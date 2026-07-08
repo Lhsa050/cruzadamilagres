@@ -4,8 +4,8 @@ Protótipo estático para criação de eventos, confirmação de presença e emi
 
 ## Telas
 
-- Painel administrativo: `#/admin`
-- Login administrativo: acesse `#/admin` sem estar logado
+- Painel administrativo: `/admin`
+- Login administrativo: acesse `/admin` sem estar logado
 - Página pública do evento: `#/evento/paul-enenche-brasil`
 - Ticket com QR Code: criado após uma confirmação de presença
 
@@ -42,7 +42,7 @@ Os dados ficam salvos no `localStorage` do navegador enquanto o protótipo é te
 
 Repositório conectado: `https://github.com/Lhsa050/cruzadamilagres`
 
-Depois que o site estiver instalado na Hostinger, acesse `#/admin`, entre como administrador e use a seção `Atualizações do sistema`.
+Depois que o site estiver instalado na Hostinger, acesse `/admin`, entre como administrador e use a seção `Atualizações do sistema`.
 
 - `Buscar atualizações`: compara o `version.json` instalado com o `version.json` publicado no GitHub.
 - `Atualizar`: baixa o ZIP da branch `main` do GitHub e substitui os arquivos do sistema.

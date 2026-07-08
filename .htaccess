@@ -1,6 +1,11 @@
 Options -Indexes
 DirectoryIndex index.html
 
+<IfModule mod_rewrite.c>
+  RewriteEngine On
+  RewriteRule ^admin/?$ index.html [L]
+</IfModule>
+
 <IfModule mod_headers.c>
   Header set X-Content-Type-Options "nosniff"
 </IfModule>

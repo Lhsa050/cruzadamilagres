@@ -2,7 +2,7 @@ const STORAGE_KEY = "vem-presenca-studio-v2";
 const AUTH_KEY = "vem-presenca-admin-auth-v1";
 const API_ENDPOINT = "api.php";
 const APP_VERSION = "1.0.0";
-const APP_BUILD = "2026-07-08.1";
+const APP_BUILD = "2026-07-08.2";
 const GITHUB_REPO = "Lhsa050/cruzadamilagres";
 const GITHUB_BRANCH = "main";
 const THEME_OPTIONS = [
@@ -174,7 +174,7 @@ function logoutAdmin() {
   setAdminAuthenticated(false);
   remoteLogout();
   toast("Sessão encerrada.");
-  window.location.hash = "#/admin";
+  navigateToAdmin();
 }
 
 function canUseRemoteApi() {
@@ -399,10 +399,50 @@ function defaultHomeRoute() {
   return { name: "admin" };
 }
 
-function defaultHomeHash() {
+function appBasePath() {
+  const path = location.pathname || "/";
+  if (path.endsWith("/admin/")) return path.slice(0, -"admin/".length) || "/";
+  if (path.endsWith("/admin")) return path.slice(0, -"admin".length) || "/";
+  if (path.endsWith("/index.html")) return path.slice(0, -"index.html".length) || "/";
+  if (path.endsWith("/")) return path;
+  return path.replace(/\/[^/]*$/, "/") || "/";
+}
+
+function adminHref() {
+  if (!canUseRemoteApi()) return "#/admin";
+  return `${appBasePath()}admin`;
+}
+
+function eventHref(slug) {
+  if (!canUseRemoteApi()) return `#/evento/${encodeURIComponent(slug || "")}`;
+  return `${appBasePath()}#/evento/${encodeURIComponent(slug || "")}`;
+}
+
+function ticketHref(id) {
+  if (!canUseRemoteApi()) return `#/ticket/${encodeURIComponent(id || "")}`;
+  return `${appBasePath()}#/ticket/${encodeURIComponent(id || "")}`;
+}
+
+function defaultHomeHref() {
   const route = defaultHomeRoute();
-  if (route.name === "event") return `#/evento/${encodeURIComponent(route.slug)}`;
-  return "#/admin";
+  if (route.name === "event") return eventHref(route.slug);
+  return adminHref();
+}
+
+function getPathRoute() {
+  const base = appBasePath();
+  const relativePath = location.pathname.slice(base.length).replace(/^\/+|\/+$/g, "");
+  if (relativePath === "admin") return { name: "admin" };
+  return null;
+}
+
+function navigateToAdmin() {
+  if (canUseRemoteApi() && window.history?.pushState) {
+    window.history.pushState(null, "", adminHref());
+    render();
+    return;
+  }
+  window.location.hash = "#/admin";
 }
 
 function applyTheme() {
@@ -473,9 +513,9 @@ function makeParticipant(event, data) {
 
 function getRoute() {
   const hash = window.location.hash;
-  if (!hash || hash === "#" || hash === "#/") return defaultHomeRoute();
+  if (!hash || hash === "#" || hash === "#/") return getPathRoute() || defaultHomeRoute();
   const parts = hash.replace(/^#\/?/, "").split("/").filter(Boolean);
-  if (!parts.length) return defaultHomeRoute();
+  if (!parts.length) return getPathRoute() || defaultHomeRoute();
   if (parts[0] === "admin") return { name: "admin" };
   if (parts[0] === "evento") return { name: "event", slug: decodeURIComponent(parts[1] || "") };
   if (parts[0] === "ticket") return { name: "ticket", id: decodeURIComponent(parts[1] || "") };
@@ -502,12 +542,17 @@ function getEventCapacity(event) {
   return event.sessions.reduce((total, session) => total + Number(session.capacity || 0), 0);
 }
 
+function absoluteAppHref(href) {
+  if (href.startsWith("#")) return `${location.href.replace(/#.*$/, "")}${href}`;
+  return `${location.origin}${href}`;
+}
+
 function getPublicUrl(event) {
-  return `${location.origin}${location.pathname}#/evento/${encodeURIComponent(event.slug)}`;
+  return absoluteAppHref(eventHref(event.slug));
 }
 
 function getTicketUrl(participant) {
-  return `${location.origin}${location.pathname}#/ticket/${encodeURIComponent(participant.id)}`;
+  return absoluteAppHref(ticketHref(participant.id));
 }
 
 function whatsappGroupUrl(event) {
@@ -571,9 +616,9 @@ function renderShell(content) {
     <div class="app-shell">
       <header class="topbar">
         <div class="topbar-inner brand-${escapeHtml(brandPosition())}">
-          ${renderBrandLink(admin ? "#/admin" : defaultHomeHash())}
+          ${renderBrandLink(admin ? adminHref() : defaultHomeHref())}
           <nav class="nav-actions" aria-label="Navegação">
-            ${admin ? `<a class="btn ghost" href="#/admin"><i data-lucide="layout-dashboard"></i><span>Painel</span></a>` : ""}
+            ${admin ? `<a class="btn ghost" href="${escapeHtml(adminHref())}"><i data-lucide="layout-dashboard"></i><span>Painel</span></a>` : ""}
             ${admin ? `<button class="btn ghost" type="button" data-action="logout-admin"><i data-lucide="log-out"></i><span>Sair</span></button>` : ""}
           </nav>
         </div>
@@ -613,7 +658,7 @@ function renderLogin(message = "") {
             </label>
             <div class="button-row">
               <button class="btn primary" type="submit"><i data-lucide="log-in"></i><span>Entrar</span></button>
-              <a class="btn" href="#/evento/${encodeURIComponent(state.events[0]?.slug || "")}"><i data-lucide="eye"></i><span>Ver como convidado</span></a>
+              <a class="btn" href="${escapeHtml(eventHref(state.events[0]?.slug || ""))}"><i data-lucide="eye"></i><span>Ver como convidado</span></a>
             </div>
           </form>
         </div>
@@ -631,7 +676,7 @@ function renderLogin(message = "") {
     if (remoteOk) {
       setAdminAuthenticated(true);
       toast("Bem-vindo ao painel.");
-      window.location.hash = "#/admin";
+      navigateToAdmin();
       return;
     }
     setFieldError(form.querySelector("input[name='email']"), "Confira o e-mail.");
@@ -2216,9 +2261,9 @@ function renderPublicEvent(event) {
     <main class="public-page">
       <header class="topbar">
         <div class="topbar-inner brand-${escapeHtml(brandPosition())}">
-          ${renderBrandLink(admin ? "#/admin" : `#/evento/${encodeURIComponent(event.slug)}`)}
+          ${renderBrandLink(admin ? adminHref() : eventHref(event.slug))}
           <nav class="nav-actions" aria-label="Navegação">
-            ${admin ? `<a class="btn ghost" href="#/admin"><i data-lucide="settings"></i><span>Painel</span></a><button class="btn ghost" type="button" data-action="logout-admin"><i data-lucide="log-out"></i><span>Sair</span></button>` : ""}
+            ${admin ? `<a class="btn ghost" href="${escapeHtml(adminHref())}"><i data-lucide="settings"></i><span>Painel</span></a><button class="btn ghost" type="button" data-action="logout-admin"><i data-lucide="log-out"></i><span>Sair</span></button>` : ""}
           </nav>
         </div>
       </header>
@@ -2327,7 +2372,7 @@ function openRsvpModal(event) {
 
   bindParticipantWizard(event, document.getElementById("rsvp-form"), (participant) => {
     closeModal();
-    window.location.hash = `#/ticket/${participant.id}`;
+    window.location.href = ticketHref(participant.id);
   });
 }
 
@@ -2348,9 +2393,9 @@ function renderTicket(participant) {
     <main class="ticket-page">
       <div class="ticket-wrap">
         <div class="button-row" style="margin: 0 0 16px;">
-          <a class="btn" href="#/evento/${encodeURIComponent(event.slug)}"><i data-lucide="arrow-left"></i><span>Voltar ao evento</span></a>
+          <a class="btn" href="${escapeHtml(eventHref(event.slug))}"><i data-lucide="arrow-left"></i><span>Voltar ao evento</span></a>
           ${admin
-            ? `<a class="btn ghost" href="#/admin"><i data-lucide="layout-dashboard"></i><span>Painel</span></a><button class="btn ghost" type="button" data-action="logout-admin"><i data-lucide="log-out"></i><span>Sair</span></button>`
+            ? `<a class="btn ghost" href="${escapeHtml(adminHref())}"><i data-lucide="layout-dashboard"></i><span>Painel</span></a><button class="btn ghost" type="button" data-action="logout-admin"><i data-lucide="log-out"></i><span>Sair</span></button>`
             : ""}
         </div>
         <section class="ticket-sheet">
@@ -2572,7 +2617,7 @@ function renderNotFound(message) {
           <div>
             <h1>${escapeHtml(message)}</h1>
             <div class="button-row">
-              <a class="btn primary" href="${admin ? "#/admin" : `#/evento/${encodeURIComponent(fallbackSlug)}`}"><i data-lucide="${admin ? "layout-dashboard" : "eye"}"></i><span>${admin ? "Voltar ao painel" : "Ver evento"}</span></a>
+              <a class="btn primary" href="${escapeHtml(admin ? adminHref() : eventHref(fallbackSlug))}"><i data-lucide="${admin ? "layout-dashboard" : "eye"}"></i><span>${admin ? "Voltar ao painel" : "Ver evento"}</span></a>
             </div>
           </div>
         </div>
@@ -2587,4 +2632,5 @@ function bootApp() {
 }
 
 window.addEventListener("hashchange", render);
+window.addEventListener("popstate", render);
 window.addEventListener("DOMContentLoaded", bootApp);

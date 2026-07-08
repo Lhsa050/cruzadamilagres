@@ -20,7 +20,7 @@
 
 ## Depois de instalado
 
-- Painel: `https://seudominio.com/index.html#/admin`
+- Painel: `https://seudominio.com/admin`
 - Página pública: `https://seudominio.com/index.html#/evento/meu-primeiro-evento`
 - Atualizações: entre no painel e use `Atualizações do sistema` para buscar/atualizar direto do GitHub.
 

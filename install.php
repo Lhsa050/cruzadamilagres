@@ -47,7 +47,7 @@ function defaultState(): array
 
 if ($installed && isset($_GET['delete']) && $_GET['delete'] === '1') {
     @unlink(__FILE__);
-    header('Location: index.html#/admin');
+    header('Location: admin');
     exit;
 }
 
@@ -122,9 +122,9 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && !$installed) {
     <?php if ($installed): ?>
       <div class="content">
         <div class="notice">Instalação concluída.</div>
-        <p>Acesse o painel em <span class="code">index.html#/admin</span>. A página pública fica em <span class="code">index.html#/evento/meu-primeiro-evento</span>.</p>
+        <p>Acesse o painel em <span class="code">/admin</span>. A página pública fica em <span class="code">index.html#/evento/meu-primeiro-evento</span>.</p>
         <div class="row">
-          <a href="index.html#/admin">Abrir painel</a>
+          <a href="admin">Abrir painel</a>
           <a class="secondary" href="install.php?delete=1">Remover instalador</a>
         </div>
         <p>Por segurança, remova este arquivo <span class="code">install.php</span> depois de instalar.</p>
