@@ -2,7 +2,7 @@ const STORAGE_KEY = "vem-presenca-studio-v2";
 const AUTH_KEY = "vem-presenca-admin-auth-v1";
 const API_ENDPOINT = "api.php";
 const APP_VERSION = "1.0.0";
-const APP_BUILD = "2026-07-08.6";
+const APP_BUILD = "2026-07-08.7";
 const GITHUB_REPO = "Lhsa050/cruzadamilagres";
 const GITHUB_BRANCH = "main";
 const THEME_OPTIONS = [
@@ -99,7 +99,7 @@ function seedState() {
     accent: "#4f7a28",
     dateLabel: "Quinta e sexta - 18 e 19 de junho",
     timeLabel: "19:00",
-    gatesLabel: "portões abrem às 17h",
+    gatesLabel: "17:00",
     locationName: "Renascer Arena",
     address: "Av. Marginal Tietê, 3712, São Paulo/SP",
     mapsUrl: "https://www.google.com/maps/search/?api=1&query=Av+Marginal+Tiete+3712+Sao+Paulo",
@@ -501,6 +501,40 @@ function formatDateTime(iso) {
     hour: "2-digit",
     minute: "2-digit"
   }).format(new Date(iso));
+}
+
+function normalizeClockInput(value) {
+  const raw = String(value || "").trim().toLowerCase();
+  if (!raw) return "";
+  const compact = raw.replace(/\s+/g, "");
+  const colon = compact.match(/(\d{1,2}):(\d{2})/);
+  const hourText = compact.match(/(\d{1,2})h(?:(\d{1,2}))?/);
+  const plain = compact.match(/^(\d{1,2})(\d{2})$/);
+  const hourOnly = compact.match(/^(\d{1,2})$/);
+  const match = colon || hourText || plain || hourOnly;
+  if (!match) return raw;
+  const hour = Number(match[1]);
+  const minute = Number(match[2] || 0);
+  if (!Number.isInteger(hour) || !Number.isInteger(minute) || hour < 0 || hour > 23 || minute < 0 || minute > 59) {
+    return "";
+  }
+  return `${String(hour).padStart(2, "0")}:${String(minute).padStart(2, "0")}`;
+}
+
+function formatClockLabel(value) {
+  const normalized = normalizeClockInput(value);
+  if (!normalized) return String(value || "").trim();
+  const [hour, minute] = normalized.split(":");
+  return minute === "00" ? `${Number(hour)}h` : `${Number(hour)}h${minute}`;
+}
+
+function eventScheduleText(event) {
+  const time = formatClockLabel(event.timeLabel);
+  const gates = formatClockLabel(event.gatesLabel);
+  return [
+    gates ? `Abertura às ${gates}` : "",
+    time ? `Evento às ${time}` : ""
+  ].filter(Boolean).join(" · ");
 }
 
 function normalizeEmail(value) {
@@ -905,12 +939,12 @@ function renderAdmin() {
                     <input name="dateLabel" value="${escapeHtml(event.dateLabel)}">
                   </label>
                   <label class="field">
-                    <span>Horário principal</span>
-                    <input name="timeLabel" value="${escapeHtml(event.timeLabel)}">
+                    <span>Horário da abertura</span>
+                    <input name="gatesLabel" type="time" step="300" value="${escapeHtml(normalizeClockInput(event.gatesLabel))}">
                   </label>
                   <label class="field">
-                    <span>Abertura</span>
-                    <input name="gatesLabel" value="${escapeHtml(event.gatesLabel)}">
+                    <span>Horário do evento</span>
+                    <input name="timeLabel" type="time" step="300" value="${escapeHtml(normalizeClockInput(event.timeLabel))}">
                   </label>
                   <label class="field">
                     <span>Local</span>
@@ -1534,8 +1568,8 @@ function saveEventFromForm(event, form) {
     coverUrl: formData.get("coverUrl").trim(),
     accent: formData.get("accentText").trim() || formData.get("accent"),
     dateLabel: formData.get("dateLabel").trim(),
-    timeLabel: formData.get("timeLabel").trim(),
-    gatesLabel: formData.get("gatesLabel").trim(),
+    timeLabel: normalizeClockInput(formData.get("timeLabel")),
+    gatesLabel: normalizeClockInput(formData.get("gatesLabel")),
     locationName: formData.get("locationName").trim(),
     address: formData.get("address").trim(),
     mapsUrl: formData.get("mapsUrl").trim(),
@@ -1618,12 +1652,12 @@ function eventCreationFormHtml() {
             <input name="dateLabel" placeholder="Ex.: Sábado, 20 de julho">
           </label>
           <label class="field">
-            <span>Horário principal</span>
-            <input name="timeLabel" placeholder="Ex.: 19:00">
+            <span>Horário da abertura</span>
+            <input name="gatesLabel" type="time" step="300">
           </label>
           <label class="field">
-            <span>Abertura</span>
-            <input name="gatesLabel" placeholder="Ex.: portões abrem às 17h">
+            <span>Horário do evento</span>
+            <input name="timeLabel" type="time" step="300">
           </label>
           <label class="field">
             <span>Local</span>
@@ -1758,8 +1792,8 @@ function bindEventCreationWizard(form) {
       coverUrl: formData.get("coverUrl").trim(),
       accent: formData.get("accentText").trim() || formData.get("accent") || "#0f766e",
       dateLabel: formData.get("dateLabel").trim(),
-      timeLabel: formData.get("timeLabel").trim(),
-      gatesLabel: formData.get("gatesLabel").trim(),
+      timeLabel: normalizeClockInput(formData.get("timeLabel")),
+      gatesLabel: normalizeClockInput(formData.get("gatesLabel")),
       locationName: formData.get("locationName").trim(),
       address: formData.get("address").trim(),
       mapsUrl: formData.get("mapsUrl").trim(),
@@ -2373,6 +2407,7 @@ function renderPublicEvent(event) {
   const available = capacity ? Math.max(capacity - confirmedPeople, 0) : null;
   const hasSessions = event.sessions.length > 0;
   const admin = isAdminAuthenticated();
+  const scheduleText = eventScheduleText(event);
 
   document.getElementById("app").innerHTML = `
     <main class="public-page">
@@ -2401,7 +2436,7 @@ function renderPublicEvent(event) {
               <div>
                 <div class="meta-label">Data</div>
                 <div class="meta-value">${escapeHtml(event.dateLabel)}</div>
-                <div class="meta-sub">${escapeHtml(event.timeLabel)} · ${escapeHtml(event.gatesLabel)}</div>
+                ${scheduleText ? `<div class="meta-sub">${escapeHtml(scheduleText)}</div>` : ""}
               </div>
             </div>
             <div class="meta-item">
