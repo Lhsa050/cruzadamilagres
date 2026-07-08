@@ -87,6 +87,11 @@ function randomToken(int $length): string
     return substr(strtolower(bin2hex(random_bytes(max(8, $length)))), 0, $length);
 }
 
+function participantHeadcountValue(array $participant): int
+{
+    return trim((string)($participant['guestName'] ?? '')) !== '' ? 2 : 1;
+}
+
 function fetchUrl(string $url)
 {
     $context = stream_context_create([
@@ -358,6 +363,11 @@ if ($action === 'register_participant') {
         }
     }
 
+    if (empty($event['allowGuests'])) {
+        $guestName = '';
+    }
+
+    $requestedPeople = $guestName !== '' ? 2 : 1;
     $capacity = (int)($session['capacity'] ?? 0);
     if ($capacity > 0) {
         $used = 0;
@@ -365,16 +375,12 @@ if ($action === 'register_participant') {
             if (is_array($participant)
                 && (string)($participant['eventId'] ?? '') === $eventId
                 && (string)($participant['sessionId'] ?? '') === $sessionId) {
-                $used++;
+                $used += participantHeadcountValue($participant);
             }
         }
-        if ($used >= $capacity) {
+        if ($used + $requestedPeople > $capacity) {
             respond(['ok' => false, 'error' => 'Sessao sem vagas disponiveis.', 'field' => 'sessionId'], 409);
         }
-    }
-
-    if (empty($event['allowGuests'])) {
-        $guestName = '';
     }
 
     $participant = [

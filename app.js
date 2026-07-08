@@ -2,7 +2,7 @@ const STORAGE_KEY = "vem-presenca-studio-v2";
 const AUTH_KEY = "vem-presenca-admin-auth-v1";
 const API_ENDPOINT = "api.php";
 const APP_VERSION = "1.0.0";
-const APP_BUILD = "2026-07-08.4";
+const APP_BUILD = "2026-07-08.5";
 const GITHUB_REPO = "Lhsa050/cruzadamilagres";
 const GITHUB_BRANCH = "main";
 const THEME_OPTIONS = [
@@ -555,6 +555,30 @@ function participantsForEvent(eventId) {
   return state.participants.filter((participant) => participant.eventId === eventId);
 }
 
+function participantHeadcount(participant) {
+  return String(participant?.guestName || "").trim() ? 2 : 1;
+}
+
+function participantsHeadcount(participants) {
+  return participants.reduce((total, participant) => total + participantHeadcount(participant), 0);
+}
+
+function checkedHeadcount(participants) {
+  return participants
+    .filter((participant) => participant.checkInAt)
+    .reduce((total, participant) => total + participantHeadcount(participant), 0);
+}
+
+function sessionHeadcount(event, sessionId) {
+  return participantsForEvent(event.id)
+    .filter((participant) => participant.sessionId === sessionId)
+    .reduce((total, participant) => total + participantHeadcount(participant), 0);
+}
+
+function requestedHeadcount(data) {
+  return String(data?.guestName || "").trim() ? 2 : 1;
+}
+
 function sessionById(event, sessionId) {
   return event.sessions.find((session) => session.id === sessionId);
 }
@@ -716,7 +740,8 @@ function renderAdmin() {
   if (!selectedEventId || !eventById(selectedEventId)) selectedEventId = state.events[0].id;
   const event = eventById(selectedEventId);
   const participants = participantsForEvent(event.id);
-  const checked = participants.filter((participant) => participant.checkInAt).length;
+  const confirmedPeople = participantsHeadcount(participants);
+  const checked = checkedHeadcount(participants);
   const capacity = getEventCapacity(event);
   const selectedSession = event.sessions[0]?.id || "";
   const adminName = brandName() || "Painel administrativo";
@@ -746,7 +771,7 @@ function renderAdmin() {
                   <img class="event-thumb" src="${escapeHtml(imageSrc(item.coverUrl))}" alt="" onerror="this.style.visibility='hidden'">
                   <span>
                     <span class="event-list-title">${escapeHtml(item.title)}</span>
-                    <span class="event-list-sub">${participantsForEvent(item.id).length} confirmados</span>
+                    <span class="event-list-sub">${participantsHeadcount(participantsForEvent(item.id))} confirmados</span>
                   </span>
                 </button>
               `).join("")}
@@ -792,8 +817,8 @@ function renderAdmin() {
                   <div class="stat-label">Confirmados</div>
                   <span class="stat-icon green"><i data-lucide="users"></i></span>
                 </div>
-                <div class="stat-value">${participants.length}</div>
-                <div class="stat-note">inscrições registradas</div>
+                <div class="stat-value">${confirmedPeople}</div>
+                <div class="stat-note">${participants.length} inscrições registradas</div>
               </div>
               <div class="stat">
                 <div class="stat-top">
@@ -801,7 +826,7 @@ function renderAdmin() {
                   <span class="stat-icon blue"><i data-lucide="badge-check"></i></span>
                 </div>
                 <div class="stat-value">${checked}</div>
-                <div class="stat-note">${participants.length ? Math.round((checked / participants.length) * 100) : 0}% presentes</div>
+                <div class="stat-note">${confirmedPeople ? Math.round((checked / confirmedPeople) * 100) : 0}% presentes</div>
               </div>
               <div class="stat">
                 <div class="stat-top">
@@ -2290,26 +2315,27 @@ async function createParticipantFromForm(event, form) {
   }
   const email = normalizeEmail(formData.get("email"));
   const phone = normalizePhone(formData.get("phone"));
+  const guestName = formData.get("guestChoice") === "yes" ? formData.get("guestName") : "";
+  const requestPeople = requestedHeadcount({ guestName });
   const usePublicServerSave = remotePersistenceReady && canUseRemoteApi() && !isAdminAuthenticated();
   if (!usePublicServerSave) {
-  const duplicate = participantsForEvent(event.id).find((participant) => {
-    return normalizeEmail(participant.email) === email || normalizePhone(participant.phone) === phone;
-  });
-  if (duplicate) {
-    const emailInput = form.querySelector("input[name='email']");
-    const phoneInput = form.querySelector("input[name='phone']");
-    if (normalizeEmail(duplicate.email) === email) setFieldError(emailInput, "Este e-mail já está inscrito neste evento.");
-    if (normalizePhone(duplicate.phone) === phone) setFieldError(phoneInput, "Este telefone já está inscrito neste evento.");
-    toast("Essa pessoa já possui inscrição neste evento.", true);
-    setWizardStep(form, 1);
-    return null;
-  }
-  const used = participantsForEvent(event.id).filter((participant) => participant.sessionId === sessionId).length;
-  if (session.capacity && used >= session.capacity) {
-    toast("Sessão sem vagas disponíveis.", true);
-    return null;
-  }
-
+    const duplicate = participantsForEvent(event.id).find((participant) => {
+      return normalizeEmail(participant.email) === email || normalizePhone(participant.phone) === phone;
+    });
+    if (duplicate) {
+      const emailInput = form.querySelector("input[name='email']");
+      const phoneInput = form.querySelector("input[name='phone']");
+      if (normalizeEmail(duplicate.email) === email) setFieldError(emailInput, "Este e-mail já está inscrito neste evento.");
+      if (normalizePhone(duplicate.phone) === phone) setFieldError(phoneInput, "Este telefone já está inscrito neste evento.");
+      toast("Essa pessoa já possui inscrição neste evento.", true);
+      setWizardStep(form, 1);
+      return null;
+    }
+    const used = sessionHeadcount(event, sessionId);
+    if (session.capacity && used + requestPeople > Number(session.capacity)) {
+      toast("Sessão sem vagas disponíveis.", true);
+      return null;
+    }
   }
 
   const participantData = {
@@ -2317,7 +2343,7 @@ async function createParticipantFromForm(event, form) {
     email,
     phone: formatPhone(formData.get("phone")),
     city: formData.get("city"),
-    guestName: formData.get("guestChoice") === "yes" ? formData.get("guestName") : "",
+    guestName,
     sessionId
   };
 
@@ -2331,8 +2357,9 @@ async function createParticipantFromForm(event, form) {
 
 function renderPublicEvent(event) {
   const participants = participantsForEvent(event.id);
+  const confirmedPeople = participantsHeadcount(participants);
   const capacity = getEventCapacity(event);
-  const available = capacity ? Math.max(capacity - participants.length, 0) : null;
+  const available = capacity ? Math.max(capacity - confirmedPeople, 0) : null;
   const hasSessions = event.sessions.length > 0;
   const admin = isAdminAuthenticated();
 
@@ -2384,7 +2411,7 @@ function renderPublicEvent(event) {
           <div class="side-block">
             <button class="btn primary" type="button" data-action="open-rsvp" ${hasSessions ? "" : "disabled"}><i data-lucide="ticket-check"></i><span>${hasSessions ? "Confirmar presença" : "Sem sessões"}</span></button>
             <div class="badge-row">
-              ${admin ? `<span class="badge success"><i data-lucide="users"></i>${participants.length} confirmados</span>` : ""}
+              ${admin ? `<span class="badge success"><i data-lucide="users"></i>${confirmedPeople} confirmados</span>` : ""}
               ${admin && available !== null ? `<span class="badge"><i data-lucide="armchair"></i>${available} vagas</span>` : ""}
               ${event.allowGuests ? `<span class="badge"><i data-lucide="user-plus"></i>convidado liberado</span>` : ""}
             </div>
@@ -2403,7 +2430,7 @@ function renderPublicEvent(event) {
             <h3>Sessões</h3>
             <div class="session-list">
               ${event.sessions.length ? event.sessions.map((session) => {
-                const used = participants.filter((participant) => participant.sessionId === session.id).length;
+                const used = sessionHeadcount(event, session.id);
                 return `
                   <div class="session-pill">
                     <strong>${escapeHtml(session.label)}</strong>
